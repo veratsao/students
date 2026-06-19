@@ -191,17 +191,27 @@
         e.target.value = '';
       };
 
-      // 【全新核心功能】：取消已核銷的補課登記，重新放回待補課追蹤名單
+      // 取消已核銷的補課登記，重新放回待補課追蹤名單
       const handleCancelMakeup = (leaveId) => {
         if (confirm("確定要取消此筆補課登記，將此學生移回「待辦補課」追蹤名單嗎？\n(此動作會清除實際補課日期與班級，保留原始請假紀錄)")) {
           setLeaves(prev => prev.map(l => {
             if (l.id === leaveId) {
-              // 重新還原回 pending 狀態，並移除補課屬性
               return { id: l.id, studentId: l.studentId, courseId: l.courseId, date: l.date, status: 'pending' };
             }
             return l;
           }));
         }
+      };
+
+      // 【全新核心功能】：在今日看板直接取消請假，將資料抹除
+      const handleCancelLeave = (studentId, date, courseId = null) => {
+        setLeaves(prev => prev.filter(l => {
+          const matchStudent = l.studentId === studentId;
+          const matchDate = l.date === date;
+          const matchCourse = courseId ? l.courseId === courseId : true;
+          // 若同時符合這三個條件，代表是要被刪除的請假紀錄，故回傳 false 將其過濾掉
+          return !(matchStudent && matchDate && matchCourse);
+        }));
       };
 
       const openDeleteConfirm = (type, id) => { setDeleteTarget({ type, id }); setIsConfirmOpen(true); };
@@ -394,6 +404,8 @@
                 const sTodayClasses = todayCoursesSorted.filter(tc => s.courses?.includes(tc.id));
                 const checkClassLeaveStatus = (cid) => leaves.some(l => l.studentId === s.id && l.courseId === cid && l.date === targetDate);
                 const isAllLeave = sTodayClasses.every(tc => checkClassLeaveStatus(tc.id));
+                const hasAnyLeave = sTodayClasses.some(tc => checkClassLeaveStatus(tc.id));
+                
                 return (
                   <div key={s.id} className="p-3 bg-white flex justify-between items-center hover:bg-gray-50/50 transition">
                     <div className="flex-1 pr-2">
@@ -402,24 +414,48 @@
                         {sTodayClasses.map(tc => {
                           const hasLeft = checkClassLeaveStatus(tc.id);
                           return (
-                            <span key={tc.id} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${hasLeft ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                              {tc.name} {hasLeft && '(已假)'}
+                            <span 
+                              key={tc.id} 
+                              onClick={() => { if(hasLeft) handleCancelLeave(s.id, targetDate, tc.id); }}
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-medium border flex items-center transition ${hasLeft ? 'bg-red-50 text-red-500 border-red-200 line-through cursor-pointer hover:bg-red-100' : 'bg-gray-50 text-gray-600 border-gray-200'}`}
+                              title={hasLeft ? "點擊直接取消此科目請假" : ""}
+                            >
+                              {tc.name} {hasLeft && ' (已假 ✕)'}
                             </span>
                           );
                         })}
                       </div>
                     </div>
+                    
+                    {/* 右側操作面板：完美整合取消請假與快速請假機制 */}
                     {selectedCourseId ? (
                       checkClassLeaveStatus(selectedCourseId) ? (
-                        <span className="text-[11px] font-black text-red-600 bg-red-50 border border-red-300 px-2 py-1 rounded">本堂已請假</span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">本堂已請假</span>
+                          <button onClick={() => handleCancelLeave(s.id, targetDate, selectedCourseId)} className="text-[10px] font-bold text-gray-500 border border-gray-300 hover:border-red-300 bg-white px-2 py-0.5 rounded transition flex items-center gap-0.5 active:scale-95 shadow-xs">
+                            <Icons.Undo />取消請假
+                          </button>
+                        </div>
                       ) : (
                         <button onClick={() => handleDashboardQuickLeave(s, 'single')} className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 px-2.5 py-1.5 rounded active:scale-95 transition">此課程請假</button>
                       )
                     ) : (
                       isAllLeave ? (
-                        <span className="text-[11px] font-black text-neutral-500 bg-neutral-50 border border-neutral-300 px-2 py-1 rounded">今日已全假</span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-[10px] font-black text-neutral-500 bg-neutral-50 border border-neutral-200 px-1.5 py-0.5 rounded">今日已全假</span>
+                          <button onClick={() => handleCancelLeave(s.id, targetDate)} className="text-[10px] font-bold text-gray-500 border border-gray-300 hover:border-red-300 bg-white px-2 py-0.5 rounded transition flex items-center gap-0.5 active:scale-95 shadow-xs">
+                            <Icons.Undo />取消全假
+                          </button>
+                        </div>
                       ) : (
-                        <button onClick={() => handleDashboardQuickLeave(s, 'all')} className="text-[11px] font-bold text-orange-700 bg-orange-50 border border-orange-200 hover:bg-orange-100 px-2.5 py-1.5 rounded active:scale-95 transition">當日全課請假</button>
+                        <div className="flex flex-col items-end gap-1">
+                          <button onClick={() => handleDashboardQuickLeave(s, 'all')} className="text-[11px] font-bold text-orange-700 bg-orange-50 border border-orange-200 hover:bg-orange-100 px-2.5 py-1.5 rounded active:scale-95 transition">當日全課請假</button>
+                          {hasAnyLeave && (
+                            <button onClick={() => handleCancelLeave(s.id, targetDate)} className="text-[10px] font-bold text-red-600 hover:underline transition flex items-center gap-0.5 mt-0.5">
+                              <Icons.Undo />還原今日所有請假
+                            </button>
+                          )}
+                        </div>
                       )
                     )}
                   </div>
@@ -548,7 +584,7 @@
       );
 
       // ==========================================
-      // 📅 【請假補課】視圖 (包含取消補課與一鍵備份)
+      // 📅 【請假補課】視圖
       // ==========================================
       const renderLeavesView = () => (
         <div className="space-y-4">
@@ -609,7 +645,6 @@
                         <span className="text-green-700 font-bold bg-green-50 px-2 py-0.5 border border-green-200 rounded text-[11px]">
                           已於 {l.makeupDate} 補修 [{courses.find(co => co.id === l.makeupCourseId)?.name}]
                         </span>
-                        {/* 核心規格：取消補課功能按鈕 */}
                         <button 
                           onClick={() => handleCancelMakeup(l.id)} 
                           className="text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded px-2 py-1 font-black text-[10px] flex items-center gap-0.5 transition active:scale-95"
@@ -643,14 +678,14 @@
               <input type="file" ref={fileInputRef} onChange={handleImportData} accept=".json" className="hidden" />
             </div>
             <div className="pt-2 border-t border-stone-200 flex justify-end">
-              <button onClick={() => openDeleteConfirm('clear_all', null)} className="px-3 py-1.5 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition">⚠ 強制清空瀏覽器本機快取</button>
+              <button onClick={() => openDeleteConfirm('clear_all', null)} className="px-3 py-1.5 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition">⚠️ 強制清空瀏覽器本機快取</button>
             </div>
           </div>
         </div>
       );
 
       // ==========================================
-      // 🛠️ 全局浮動彈窗面板 (時段複製功能已完美內建)
+      // 🛠️ 全局浮動彈窗面板
       // ==========================================
       const renderFormModal = () => {
         if (!isModalOpen) return null;
