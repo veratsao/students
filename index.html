@@ -1,916 +1,951 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>班級課程與請假管理系統</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.21.4/babel.min.js"></script>
-  <style>
-    .scrollbar-hide::-webkit-scrollbar { display: none; }
-    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-    body { -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-    
-    /* MUJI日雜美學規範 */
-    .muji-border { border: 1.5px solid #222222; }
-    .muji-card { border: 1.5px solid #222222; background-color: #ffffff; box-shadow: 2px 2px 0px #222222; }
-    .muji-input { border: 1.5px solid #222222; background-color: #ffffff; }
-    .muji-input:focus { outline: none; border-color: #7f7870; }
-    
-    /* 底部導覽列安全範圍 */
-    .safe-bottom { padding-bottom: calc(env(safe-area-inset-bottom) + 5rem); }
-  </style>
-</head>
-<body class="bg-[#fbfbfa] text-[#222222] antialiased">
-  <div id="root"></div>
-
-  <script type="text/babel">
-    const { useState, useEffect, useMemo, useRef } = React;
-
-    // 手繪極簡圖標庫
-    const Icons = {
-      Home: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
-      Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>,
-      BookOpen: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
-      Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
-      ChevronDown: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>,
-      ChevronUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>,
-      Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
-      Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
-      X: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
-      Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
-      Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>,
-      Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>,
-      Copy: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>,
-      Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
-      Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
-      Undo: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
-    };
-
-    const DAYS_SHORT = ['日', '一', '二', '三', '四', '五', '六'];
-    const DAYS_FULL = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-
-    // 內建預設測試資料
-    const INITIAL_COURSES = [
-      { id: 'c1', name: '籃球班', schedule: [{ day: 1, startTime: '16:00', endTime: '17:30' }, { day: 3, startTime: '18:00', endTime: '19:30' }], crossMakeupCourseIds: ['c2'] },
-      { id: 'c2', name: '羽球班', schedule: [{ day: 1, startTime: '17:30', endTime: '19:00' }, { day: 4, startTime: '16:00', endTime: '17:30' }], crossMakeupCourseIds: ['c1'] },
-      { id: 'c3', name: '游泳班', schedule: [{ day: 5, startTime: '17:00', endTime: '18:30' }], crossMakeupCourseIds: [] }
-    ];
-
-    const INITIAL_STUDENTS = [
-      { id: 's1', name: '陳小明', courses: ['c1', 'c2'] },
-      { id: 's2', name: '林小華', courses: ['c1'] },
-      { id: 's3', name: '張大同', courses: ['c2', 'c3'] }
-    ];
-
-    const App = () => {
-      // --- 核心資料狀態 ---
-      const [students, setStudents] = useState(() => JSON.parse(localStorage.getItem('local_students')) || INITIAL_STUDENTS);
-      const [courses, setCourses] = useState(() => JSON.parse(localStorage.getItem('local_courses')) || INITIAL_COURSES);
-      const [leaves, setLeaves] = useState(() => JSON.parse(localStorage.getItem('local_leaves')) || []);
-      
-      const [activeTab, setActiveTab] = useState('dashboard'); 
-      const [targetDate, setTargetDate] = useState(() => new Date().toISOString().split('T')[0]);
-      const [selectedCourseId, setSelectedCourseId] = useState(null);
-
-      const [studentSearch, setStudentSearch] = useState('');
-      const [expandedStudentId, setExpandedStudentId] = useState(null);
-      const [leaveSearch, setLeaveSearch] = useState('');
-      const [quickCourseName, setQuickCourseName] = useState('');
-      const fileInputRef = useRef(null);
-
-      const [isModalOpen, setIsModalOpen] = useState(false);
-      const [modalType, setModalType] = useState(''); 
-      const [editingItem, setEditingItem] = useState(null);
-      const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-      const [deleteTarget, setDeleteTarget] = useState({ type: '', id: null });
-
-      const [studentForm, setStudentForm] = useState({ name: '', batchNames: '' });
-      const [courseForm, setCourseForm] = useState({ name: '', schedules: [{ day: 1, startTime: '16:00', endTime: '17:30' }], crossMakeupCourseIds: [] });
-      const [enrollForm, setEnrollForm] = useState({ studentIds: [], courseIds: [] });
-      const [leaveForm, setLeaveForm] = useState({ studentId: '', courseId: 'all_courses_today', tempDate: '', startDate: '', endDate: '', dates: [] });
-      const [makeupForm, setMakeupForm] = useState({ date: '', courseId: '' });
-
-      useEffect(() => { localStorage.setItem('local_students', JSON.stringify(students)); }, [students]);
-      useEffect(() => { localStorage.setItem('local_courses', JSON.stringify(courses)); }, [courses]);
-      useEffect(() => { localStorage.setItem('local_leaves', JSON.stringify(leaves)); }, [leaves]);
-      useEffect(() => { setSelectedCourseId(null); }, [targetDate]);
-
-      const adjustTargetDate = (days) => {
-        const d = new Date(targetDate);
-        d.setDate(d.getDate() + days);
-        setTargetDate(d.toISOString().split('T')[0]);
-      };
-
-      const targetDayIndex = useMemo(() => new Date(targetDate).getDay(), [targetDate]);
-
-      const sortedCourses = useMemo(() => {
-        return [...courses].map(c => ({
+<!DOCTYPE html> 
+<html lang="zh-TW"> 
+<head> 
+  <meta charset="UTF-8"> 
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> 
+  <title>班級課程與請假管理系統 - 專業進化版</title> 
+  <script src="https://cdn.tailwindcss.com"></script> 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script> 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script> 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.21.4/babel.min.js"></script> 
+  <style> 
+    .scrollbar-hide::-webkit-scrollbar { display: none; } 
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; } 
+    body { -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; } 
+     
+    /* MUJI日雜美學規範 */ 
+    .muji-border { border: 1.5px solid #222222; } 
+    .muji-card { border: 1.5px solid #222222; background-color: #ffffff; box-shadow: 2px 2px 0px #222222; } 
+    .muji-input { border: 1.5px solid #222222; background-color: #ffffff; } 
+    .muji-input:focus { outline: none; border-color: #7f7870; } 
+     
+    /* 底部導覽列安全範圍 */ 
+    .safe-bottom { padding-bottom: calc(env(safe-area-inset-bottom) + 5rem); } 
+  </style> 
+</head> 
+<body class="bg-[#fbfbfa] text-[#222222] antialiased"> 
+  <div id="root"></div> 
+ 
+  <script type="text/babel"> 
+    const { useState, useEffect, useMemo, useRef } = React; 
+ 
+    // 手繪極簡圖標庫 
+    const Icons = { 
+      Home: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>, 
+      Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>, 
+      BookOpen: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>, 
+      Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>, 
+      ChevronDown: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>, 
+      ChevronUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>, 
+      Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>, 
+      Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>, 
+      X: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>, 
+      Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>, 
+      Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>, 
+      Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>, 
+      Copy: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>, 
+      Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>, 
+      Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>, 
+      Undo: () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg> 
+    }; 
+ 
+    const DAYS_SHORT = ['日', '一', '二', '三', '四', '五', '六']; 
+    const DAYS_FULL = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']; 
+ 
+    // 內建預設測試資料 (新增期數與上課區間)
+    const INITIAL_COURSES = [ 
+      { id: 'c1', name: '籃球班', term: '2026第一期', startDate: '2026-01-01', endDate: '2026-06-30', schedule: [{ day: 1, startTime: '16:00', endTime: '17:30' }, { day: 3, startTime: '18:00', endTime: '19:30' }], crossMakeupCourseIds: ['c2'] }, 
+      { id: 'c2', name: '羽球班', term: '2026第一期', startDate: '2026-01-01', endDate: '2026-06-30', schedule: [{ day: 1, startTime: '17:30', endTime: '19:00' }, { day: 4, startTime: '16:00', endTime: '17:30' }], crossMakeupCourseIds: ['c1'] }, 
+      { id: 'c3', name: '游泳班', term: '夏季密集班', startDate: '2026-07-01', endDate: '2026-08-31', schedule: [{ day: 5, startTime: '17:00', endTime: '18:30' }], crossMakeupCourseIds: [] } 
+    ]; 
+ 
+    const INITIAL_STUDENTS = [ 
+      { id: 's1', name: '陳小明', courses: ['c1', 'c2'] }, 
+      { id: 's2', name: '林小華', courses: ['c1'] }, 
+      { id: 's3', name: '張大同', courses: ['c2', 'c3'] } 
+    ]; 
+ 
+    const App = () => { 
+      // --- 核心資料狀態 --- 
+      const [students, setStudents] = useState(() => JSON.parse(localStorage.getItem('local_students')) || INITIAL_STUDENTS); 
+      const [courses, setCourses] = useState(() => {
+        const stored = JSON.parse(localStorage.getItem('local_courses')) || INITIAL_COURSES;
+        // 確保舊資料也有預設日期與期數欄位
+        return stored.map(c => ({
           ...c,
-          schedule: [...(c.schedule || [])].sort((a, b) => {
-            if (a.day !== b.day) return a.day - b.day;
-            return a.startTime.localeCompare(b.startTime);
-          })
+          term: c.term || '常態班',
+          startDate: c.startDate || '2026-01-01',
+          endDate: c.endDate || '2026-12-31'
+        }));
+      }); 
+      const [leaves, setLeaves] = useState(() => JSON.parse(localStorage.getItem('local_leaves')) || []); 
+       
+      const [activeTab, setActiveTab] = useState('dashboard');  
+      const [targetDate, setTargetDate] = useState(() => new Date().toISOString().split('T')[0]); 
+      const [selectedCourseId, setSelectedCourseId] = useState(null); 
+ 
+      const [studentSearch, setStudentSearch] = useState(''); 
+      const [expandedStudentId, setExpandedStudentId] = useState(null); 
+      const [leaveSearch, setLeaveSearch] = useState(''); 
+      const [quickCourseName, setQuickCourseName] = useState(''); 
+      const fileInputRef = useRef(null); 
+ 
+      const [isModalOpen, setIsModalOpen] = useState(false); 
+      const [modalType, setModalType] = useState('');  
+      const [editingItem, setEditingItem] = useState(null); 
+      const [isConfirmOpen, setIsConfirmOpen] = useState(false); 
+      const [deleteTarget, setDeleteTarget] = useState({ type: '', id: null }); 
+ 
+      const [studentForm, setStudentForm] = useState({ name: '', batchNames: '' }); 
+      
+      // 擴充表單狀態：包含 term, startDate, endDate
+      const [courseForm, setCourseForm] = useState({ 
+        name: '', 
+        term: '第一期', 
+        startDate: new Date().toISOString().split('T')[0], 
+        endDate: new Date(Date.now() + 90*24*60*60*1000).toISOString().split('T')[0], // 預設三個月後
+        schedules: [{ day: 1, startTime: '16:00', endTime: '17:30' }], 
+        crossMakeupCourseIds: [] 
+      }); 
+      const [enrollForm, setEnrollForm] = useState({ studentIds: [], courseIds: [] }); 
+      const [leaveForm, setLeaveForm] = useState({ studentId: '', courseId: 'all_courses_today', tempDate: '', startDate: '', endDate: '', dates: [] }); 
+      const [makeupForm, setMakeupForm] = useState({ date: '', courseId: '' }); 
+ 
+      useEffect(() => { localStorage.setItem('local_students', JSON.stringify(students)); }, [students]); 
+      useEffect(() => { localStorage.setItem('local_courses', JSON.stringify(courses)); }, [courses]); 
+      useEffect(() => { localStorage.setItem('local_leaves', JSON.stringify(leaves)); }, [leaves]); 
+      useEffect(() => { setSelectedCourseId(null); }, [targetDate]); 
+ 
+      const adjustTargetDate = (days) => { 
+        const d = new Date(targetDate); 
+        d.setDate(d.getDate() + days); 
+        setTargetDate(d.toISOString().split('T')[0]); 
+      }; 
+ 
+      const targetDayIndex = useMemo(() => new Date(targetDate).getDay(), [targetDate]); 
+ 
+      // 排序與處理課程資料
+      const sortedCourses = useMemo(() => { 
+        return [...courses].map(c => ({ 
+          ...c, 
+          schedule: [...(c.schedule || [])].sort((a, b) => { 
+            if (a.day !== b.day) return a.day - b.day; 
+            return a.startTime.localeCompare(b.startTime); 
+          }) 
         })).sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
-      }, [courses]);
+      }, [courses]); 
 
-      const todayCoursesSorted = useMemo(() => {
-        const filtered = sortedCourses.filter(c => c.schedule?.some(s => s.day === targetDayIndex));
-        return filtered.sort((a, b) => {
-          const slotA = a.schedule.find(s => s.day === targetDayIndex);
-          const slotB = b.schedule.find(s => s.day === targetDayIndex);
-          if (!slotA || !slotB) return 0;
-          return slotA.startTime.localeCompare(slotB.startTime);
+      // 【核心優化】過濾出當前目標日期「有開課」且「在日期區間內」的課程
+      const activeCoursesToday = useMemo(() => {
+        return sortedCourses.filter(c => {
+          // 1. 檢查日期區間
+          if (c.startDate && targetDate < c.startDate) return false;
+          if (c.endDate && targetDate > c.endDate) return false;
+          // 2. 檢查星期幾
+          return c.schedule.some(s => s.day === targetDayIndex);
         });
-      }, [sortedCourses, targetDayIndex]);
+      }, [sortedCourses, targetDate, targetDayIndex]);
 
-      const todayAllStudents = useMemo(() => {
-        return students.filter(s => s.courses?.some(cid => todayCoursesSorted.some(tc => tc.id === cid)));
-      }, [students, todayCoursesSorted]);
-
-      const displayStudentsOnDashboard = useMemo(() => {
-        if (!selectedCourseId) return todayAllStudents;
-        return students.filter(s => s.courses?.includes(selectedCourseId));
-      }, [selectedCourseId, todayAllStudents, students]);
-
-      const getMakeupOptions = (courseId) => {
-        const course = courses.find(c => c.id === courseId);
-        if (!course || !course.crossMakeupCourseIds) return [];
-        return courses
-          .filter(c => course.crossMakeupCourseIds.includes(c.id))
-          .flatMap(c => c.schedule.map(s => ({
-            courseId: c.id,
-            courseName: c.name,
-            displayText: `星期${DAYS_SHORT[s.day]} ${c.name} (${s.startTime})`
-          })));
+      // 輔助函式：格式化課程完整名稱（含期數與區間）
+      const getCourseFullName = (course) => {
+        if (!course) return '';
+        return `${course.name} (${course.term || '常態'}) [${course.startDate || ''} ~ ${course.endDate || ''}]`;
       };
 
-      const sortedHistoryLeaves = useMemo(() => {
-        return [...leaves].sort((a, b) => b.date.localeCompare(a.date));
-      }, [leaves]);
+      // 處理開啟新增/編輯課程視窗
+      const openCourseModal = (course = null) => {
+        if (course) {
+          setEditingItem(course);
+          setCourseForm({
+            name: course.name,
+            term: course.term || '',
+            startDate: course.startDate || '',
+            endDate: course.endDate || '',
+            schedules: course.schedule.map(s => ({ ...s })),
+            crossMakeupCourseIds: course.crossMakeupCourseIds || []
+          });
+        } else {
+          setEditingItem(null);
+          setCourseForm({
+            name: '',
+            term: '第一期',
+            startDate: targetDate,
+            endDate: new Date(new Date(targetDate).getTime() + 90*24*60*60*1000).toISOString().split('T')[0],
+            schedules: [{ day: targetDayIndex === 0 ? 1 : targetDayIndex, startTime: '16:00', endTime: '17:30' }],
+            crossMakeupCourseIds: []
+          });
+        }
+        setModalType('course');
+        setIsModalOpen(true);
+      };
 
-      const filteredHistoryLeaves = useMemo(() => {
-        return sortedHistoryLeaves.filter(l => {
-          const s = students.find(st => st.id === l.studentId);
-          return s ? s.name.toLowerCase().includes(leaveSearch.toLowerCase()) : false;
-        });
-      }, [sortedHistoryLeaves, students, leaveSearch]);
+      const handleSaveCourse = () => {
+        if (!courseForm.name.trim() || !courseForm.term.trim()) {
+          alert('請輸入課程名稱與期數班別！');
+          return;
+        }
+        if (courseForm.startDate > courseForm.endDate) {
+          alert('開始日期不能大於結束日期！');
+          return;
+        }
 
-      const handleExportData = () => {
-        const backupData = { version: "1.2", exportAt: new Date().toLocaleString(), students, courses, leaves };
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+        const newCourseData = {
+          id: editingItem ? editingItem.id : 'c_' + Date.now(),
+          name: courseForm.name.trim(),
+          term: courseForm.term.trim(),
+          startDate: courseForm.startDate,
+          endDate: courseForm.endDate,
+          schedule: courseForm.schedules,
+          crossMakeupCourseIds: courseForm.crossMakeupCourseIds
+        };
+
+        if (editingItem) {
+          setCourses(courses.map(c => c.id === editingItem.id ? newCourseData : c));
+        } else {
+          setCourses([...courses, newCourseData]);
+        }
+        setIsModalOpen(false);
+      };
+
+      const handleDeleteClick = (type, id) => {
+        setDeleteTarget({ type, id });
+        setIsConfirmOpen(true);
+      };
+
+      const handleConfirmDelete = () => {
+        if (deleteTarget.type === 'course') {
+          setCourses(courses.filter(c => c.id !== deleteTarget.id));
+          // 同步移除學生選課
+          setStudents(students.map(s => ({
+            ...s,
+            courses: s.courses.filter(cid => cid !== deleteTarget.id)
+          })));
+        } else if (deleteTarget.type === 'student') {
+          setStudents(students.filter(s => s.id !== deleteTarget.id));
+        } else if (deleteTarget.type === 'leave') {
+          setLeaves(leaves.filter(l => l.id !== deleteTarget.id));
+        }
+        setIsConfirmOpen(false);
+      };
+
+      // 快速新增常態課程
+      const handleQuickCourseSubmit = (e) => {
+        e.preventDefault();
+        if (!quickCourseName.trim()) return;
+        const newC = {
+          id: 'c_' + Date.now(),
+          name: quickCourseName.trim(),
+          term: '常態班',
+          startDate: '2026-01-01',
+          endDate: '2026-12-31',
+          schedule: [{ day: targetDayIndex === 0 ? 1 : targetDayIndex, startTime: '16:00', endTime: '17:30' }],
+          crossMakeupCourseIds: []
+        };
+        setCourses([...courses, newC]);
+        setQuickCourseName('');
+      };
+
+      // --- 渲染各分頁 UI ---
+
+      // 1. 今日看板
+      const renderDashboard = () => {
+        const activeCourse = activeCoursesToday.find(c => c.id === selectedCourseId) || activeCoursesToday[0];
+        
+        return (
+          <div class="space-y-6">
+            {/* 日期選擇列 */}
+            <div class="flex items-center justify-between p-4 muji-card">
+              <button onClick={() => adjustTargetDate(-1)} class="px-3 py-1 bg-[#222222] text-white text-xs font-bold rounded">◀ 前一天</button>
+              <div class="text-center">
+                <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} class="font-bold text-center bg-transparent outline-none" />
+                <div class="text-xs text-gray-500 font-medium mt-0.5">{DAYS_FULL[targetDayIndex]}</div>
+              </div>
+              <button onClick={() => adjustTargetDate(1)} class="px-3 py-1 bg-[#222222] text-white text-xs font-bold rounded">後一天 ▶</button>
+            </div>
+
+            {/* 今日課程橫向滾動區 */}
+            <div>
+              <h3 class="text-xs font-black text-gray-400 tracking-wider mb-2">TODAY'S COURSES / 今日開課期數 ({activeCoursesToday.length})</h3>
+              {activeCoursesToday.length === 0 ? (
+                <div class="p-6 text-center text-sm text-gray-400 muji-card bg-gray-50">此日期區間內今日無安排課程</div>
+              ) : (
+                <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  {activeCoursesToday.map(c => {
+                    const isSel = activeCourse && activeCourse.id === c.id;
+                    const todaySched = c.schedule.filter(s => s.day === targetDayIndex);
+                    return (
+                      <button 
+                        key={c.id} 
+                        onClick={() => setSelectedCourseId(c.id)}
+                        class={`flex-shrink-0 p-3 w-40 text-left muji-card transition-all ${isSel ? 'bg-[#7f7870] text-white border-[#7f7870]' : ''}`}
+                      >
+                        <div class="font-black text-sm truncate">{c.name}</div>
+                        <div class={`text-[10px] font-bold truncate ${isSel ? 'text-gray-200' : 'text-gray-500'}`}>{c.term}</div>
+                        <div class="mt-2 text-xs font-mono">
+                          {todaySched.map((s, idx) => <div key={idx}>{s.startTime}-{s.endTime}</div>)}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 當前選定課程之學生點名狀態 */}
+            {activeCourse && (
+              <div class="p-5 muji-card space-y-4">
+                <div class="flex justify-between items-start border-b border-gray-200 pb-3">
+                  <div>
+                    <span class="inline-block px-2 py-0.5 bg-black text-white text-[10px] font-bold mb-1 rounded">{activeCourse.term}</span>
+                    <h2 class="text-lg font-black">{activeCourse.name} 學生名單</h2>
+                    <p class="text-xs text-gray-400 mt-0.5">授課區間: {activeCourse.startDate} 至 {activeCourse.endDate}</p>
+                  </div>
+                  <div class="text-right text-xs font-bold bg-gray-100 px-2 py-1 rounded muji-border">
+                    星期{DAYS_SHORT[targetDayIndex]}
+                  </div>
+                </div>
+
+                {/* 學生列表與請假/到課狀態呈現 */}
+                <div class="divide-y divide-gray-100">
+                  {students.filter(s => s.courses.includes(activeCourse.id)).length === 0 ? (
+                    <div class="py-4 text-center text-sm text-gray-400">本期數尚無學生選課</div>
+                  ) : (
+                    students.filter(s => s.courses.includes(activeCourse.id)).map(student => {
+                      const isLeft = leaves.some(l => l.studentId === student.id && l.courseId === activeCourse.id && l.date === targetDate && l.type === 'leave');
+                      const isMakeup = leaves.some(l => l.studentId === student.id && l.courseId === activeCourse.id && l.date === targetDate && l.type === 'makeup');
+                      
+                      return (
+                        <div key={student.id} class="flex items-center justify-between py-3">
+                          <div class="flex items-center gap-2">
+                            <span class="font-black text-base">{student.name}</span>
+                            {isLeft && <span class="text-xs font-bold px-1.5 py-0.5 bg-red-100 text-red-700 rounded border border-red-300">請假</span>}
+                            {isMakeup && <span class="text-xs font-bold px-1.5 py-0.5 bg-green-100 text-green-700 rounded border border-green-300">補課</span>}
+                            {!isLeft && !isMakeup && <span class="text-xs font-bold px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">一般到課</span>}
+                          </div>
+                          
+                          {/* 快速點名應變操作 */}
+                          <div class="flex gap-2">
+                            {isLeft ? (
+                              <button 
+                                onClick={() => setLeaves(leaves.filter(l => !(l.studentId === student.id && l.courseId === activeCourse.id && l.date === targetDate && l.type === 'leave')))}
+                                class="p-1 text-xs font-bold border border-gray-400 rounded hover:bg-gray-50 flex items-center gap-1"
+                              >
+                                <Icons.Undo /> 撤銷請假
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => {
+                                  const newL = { id: 'l_' + Date.now(), studentId: student.id, courseId: activeCourse.id, date: targetDate, type: 'leave', status: 'pending' };
+                                  setLeaves([...leaves, newL]);
+                                }}
+                                disabled={isMakeup}
+                                class={`px-2 py-1 text-xs font-bold rounded muji-border bg-white text-red-600 ${isMakeup ? 'opacity-30' : 'hover:bg-red-50'}`}
+                              >
+                                快速請假
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // 2. 學生選課管理
+      const renderStudents = () => {
+        const filteredStudents = students.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()));
+        
+        return (
+          <div class="space-y-4">
+            <div class="flex gap-2">
+              <div class="relative flex-1">
+                <span class="absolute inset-y-0 left-3 flex items-center text-gray-400"><Icons.Search /></span>
+                <input type="text" placeholder="搜尋學生姓名..." value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} class="w-full pl-9 pr-4 py-2 text-sm muji-input rounded-md" />
+              </div>
+              <button 
+                onClick={() => {
+                  setStudentForm({ name: '', batchNames: '' });
+                  setEditingItem(null);
+                  setModalType('student');
+                  setIsModalOpen(true);
+                }}
+                class="px-3 py-2 bg-black text-white text-sm font-bold rounded-md flex items-center gap-1 shadow"
+              >
+                <Icons.Plus /> 新增學生
+              </button>
+            </div>
+
+            <div class="space-y-2">
+              {filteredStudents.map(student => {
+                const isExpanded = expandedStudentId === student.id;
+                return (
+                  <div key={student.id} class="muji-card overflow-hidden">
+                    <div class="p-4 flex items-center justify-between bg-white cursor-pointer" onClick={() => setExpandedStudentId(isExpanded ? null : student.id)}>
+                      <div>
+                        <div class="font-black text-base text-gray-800">{student.name}</div>
+                        <div class="text-xs text-gray-400 mt-0.5">已選期數: {student.courses.length} 門</div>
+                      </div>
+                      <div class="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => {
+                          setEditingItem(student);
+                          setStudentForm({ name: student.name, batchNames: '' });
+                          setModalType('student');
+                          setIsModalOpen(true);
+                        }} class="p-1 text-gray-500 hover:text-black"><Icons.Edit /></button>
+                        <button onClick={() => handleDeleteClick('student', student.id)} class="p-1 text-red-500 hover:text-red-700"><Icons.Trash /></button>
+                        <span class="text-gray-400">{isExpanded ? <Icons.ChevronUp /> : <Icons.ChevronDown />}</span>
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div class="bg-[#fcfcfb] p-4 border-t border-gray-100 space-y-3">
+                        <div class="flex justify-between items-center">
+                          <h4 class="text-xs font-black text-gray-500">該學生的選課期數表</h4>
+                          <button 
+                            onClick={() => {
+                              setEnrollForm({ studentIds: [student.id], courseIds: [] });
+                              setModalType('enroll');
+                              setIsModalOpen(true);
+                            }}
+                            class="px-2 py-0.5 border border-black text-xs font-bold rounded bg-white hover:bg-gray-50"
+                          >
+                            + 調整選課
+                          </button>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                          {student.courses.length === 0 ? (
+                            <span class="text-xs text-gray-400">目前尚無選修任何課程。</span>
+                          ) : (
+                            student.courses.map(cid => {
+                              const c = courses.find(item => item.id === cid);
+                              return (
+                                <span key={cid} class="px-2.5 py-1 bg-white text-xs font-bold rounded muji-border flex items-center gap-1">
+                                  {c ? `${c.name} (${c.term})` : '未知課程'}
+                                  <button onClick={() => {
+                                    setStudents(students.map(s => s.id === student.id ? { ...s, courses: s.courses.filter(id => id !== cid) } : s));
+                                  }} class="text-gray-400 hover:text-red-500 ml-1">×</button>
+                                </span>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      };
+
+      // 3. 課表與期數設定管理
+      const renderCourses = () => {
+        return (
+          <div class="space-y-4">
+            {/* 頂部快速建常態課 */}
+            <form onSubmit={handleQuickCourseSubmit} class="flex gap-2 p-3 bg-white muji-card">
+              <input type="text" placeholder="快速建立新課程名稱..." value={quickCourseName} onChange={(e) => setQuickCourseName(e.target.value)} class="flex-1 px-3 py-1 text-sm outline-none border-b border-gray-300 focus:border-black" />
+              <button type="submit" class="px-3 py-1 bg-gray-100 text-xs font-bold rounded muji-border hover:bg-gray-200">+ 建立常態課</button>
+            </form>
+
+            <div class="flex justify-between items-center pt-2">
+              <h3 class="text-xs font-black text-gray-400 tracking-wider">ALL TERMS & COURSES / 全部的課程期數</h3>
+              <button onClick={() => openCourseModal(null)} class="px-3 py-1.5 bg-black text-white text-xs font-bold rounded flex items-center gap-1 shadow">
+                <Icons.Plus /> 新增完整排程與期數
+              </button>
+            </div>
+
+            <div class="space-y-3">
+              {sortedCourses.map(course => (
+                <div key={course.id} class="p-4 muji-card bg-white space-y-2">
+                  <div class="flex justify-between items-start">
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <h4 class="font-black text-base">{course.name}</h4>
+                        <span class="px-2 py-0.5 bg-gray-100 text-[#222222] text-[10px] font-bold rounded muji-border">{course.term}</span>
+                      </div>
+                      <p class="text-xs text-gray-400 font-medium mt-1">
+                        📅 上課日期區間: <span class="text-gray-700 font-mono font-bold">{course.startDate}</span> ~ <span class="text-gray-700 font-mono font-bold">{course.endDate}</span>
+                      </p>
+                    </div>
+                    <div class="flex gap-2">
+                      <button onClick={() => openCourseModal(course)} class="p-1 text-gray-500 hover:text-black"><Icons.Edit /></button>
+                      <button onClick={() => handleDeleteClick('course', course.id)} class="p-1 text-red-500 hover:text-red-700"><Icons.Trash /></button>
+                    </div>
+                  </div>
+
+                  <div class="pt-2 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span class="text-gray-400 block mb-0.5">每週固定上課時段：</span>
+                      <div class="space-y-0.5 font-mono">
+                        {course.schedule.map((s, idx) => (
+                          <div key={idx} class="text-gray-700 font-bold">
+                            星期{DAYS_SHORT[s.day]} : {s.startTime} ~ {s.endTime}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <span class="text-gray-400 block mb-0.5">允許跨班互補科目：</span>
+                      <div class="flex flex-wrap gap-1 mt-0.5">
+                        {course.crossMakeupCourseIds && course.crossMakeupCourseIds.length > 0 ? (
+                          course.crossMakeupCourseIds.map(cid => {
+                            const targetC = courses.find(c => c.id === cid);
+                            return <span key={cid} class="px-1.5 py-0.5 bg-gray-50 text-[10px] rounded border text-gray-600">{targetC ? targetC.name : '未知'}</span>;
+                          })
+                        ) : (
+                          <span class="text-gray-400 italic text-[11px]">無指定</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      };
+
+      // 4. 請假與補課作業
+      const renderLeaves = () => {
+        return (
+          <div class="space-y-4">
+            <div class="flex gap-2">
+              <button 
+                onClick={() => {
+                  setLeaveForm({ studentId: '', courseId: 'all_courses_today', tempDate: targetDate, startDate: '', endDate: '', dates: [] });
+                  setModalType('leave');
+                  setIsModalOpen(true);
+                }}
+                class="flex-1 py-2.5 bg-red-50 text-red-700 border border-red-300 font-black text-sm rounded-md shadow-sm text-center"
+              >
+                + 登記學員請假
+              </button>
+              <button 
+                onClick={() => {
+                  setMakeupForm({ date: targetDate, courseId: '' });
+                  setModalType('makeup');
+                  setIsModalOpen(true);
+                }}
+                class="flex-1 py-2.5 bg-green-50 text-green-700 border border-green-300 font-black text-sm rounded-md shadow-sm text-center"
+              >
+                + 安排學員補課
+              </button>
+            </div>
+
+            <div class="muji-card p-4 bg-white">
+              <h3 class="text-xs font-black text-gray-400 tracking-wider mb-3">LEAVE HISTORY / 請假與補課總誌</h3>
+              <div class="divide-y divide-gray-100 text-sm">
+                {leaves.length === 0 ? (
+                  <div class="py-6 text-center text-gray-400">當前無任何請假或補課歷史紀錄</div>
+                ) : (
+                  [...leaves].reverse().map(item => {
+                    const student = students.find(s => s.id === item.studentId);
+                    const course = courses.find(c => c.id === item.courseId);
+                    return (
+                      <div key={item.id} class="py-3 flex items-center justify-between">
+                        <div>
+                          <div class="flex items-center gap-2">
+                            <span class="font-bold text-gray-800">{student ? student.name : '未知學生'}</span>
+                            <span class={`text-[10px] font-black px-1.5 py-0.2 rounded ${item.type === 'leave' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                              {item.type === 'leave' ? '請假' : '補課'}
+                            </span>
+                          </div>
+                          <div class="text-xs text-gray-500 mt-1">
+                            日期: <span class="font-mono font-bold text-gray-700">{item.date}</span> | 課程: {course ? getCourseFullName(course) : '未知'}
+                          </div>
+                        </div>
+                        <button onClick={() => handleDeleteClick('leave', item.id)} class="text-gray-400 hover:text-red-500 p-1"><Icons.Trash /></button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // --- 彈出視窗整合表單渲染 ---
+      const renderModal = () => {
+        if (!isModalOpen) return null;
+
+        return (
+          <div class="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+            <div class="bg-white w-full max-w-md muji-card p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+              <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-black text-base">
+                  {modalType === 'student' && (editingItem ? '編輯學生資料' : '批次/單筆新增學生')}
+                  {modalType === 'course' && (editingItem ? '修改排程期數設定' : '新增課程與日期區間')}
+                  {modalType === 'enroll' && '調整學生選修期數'}
+                  {modalType === 'leave' && '登記學生請假'}
+                  {modalType === 'makeup' && '手動安排補課'}
+                </h3>
+                <button onClick={() => setIsModalOpen(false)} class="p-1 text-gray-400 hover:text-black"><Icons.X /></button>
+              </div>
+
+              {/* A. 學生表單 */}
+              {modalType === 'student' && (
+                <div class="space-y-3">
+                  <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">學生姓名</label>
+                    <input type="text" value={studentForm.name} onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })} placeholder="單筆新增或編輯姓名..." class="w-full p-2 text-sm muji-input rounded" />
+                  </div>
+                  {!editingItem && (
+                    <div>
+                      <label class="block text-xs font-bold text-gray-500 mb-1">同時大量批次新增 (使用空格或換行區隔)</label>
+                      <textarea rows="3" value={studentForm.batchNames} onChange={(e) => setStudentForm({ ...studentForm, batchNames: e.target.value })} placeholder="例: 王大明 李小美 張中同" class="w-full p-2 text-sm muji-input rounded resize-none" />
+                    </div>
+                  )}
+                  <button onClick={() => {
+                    if (editingItem) {
+                      setStudents(students.map(s => s.id === editingItem.id ? { ...s, name: studentForm.name.trim() } : s));
+                    } else {
+                      let list = [];
+                      if (studentForm.name.trim()) list.push(studentForm.name.trim());
+                      if (studentForm.batchNames.trim()) {
+                        const parsed = studentForm.batchNames.split(/[\s\n]+/).map(n => n.trim()).filter(Boolean);
+                        list = [...list, ...parsed];
+                      }
+                      if (list.length === 0) return alert('請填寫姓名');
+                      const newStudents = list.map(name => ({ id: 's_' + Date.now() + Math.random().toString(36).substr(2, 5), name, courses: [] }));
+                      setStudents([...students, ...newStudents]);
+                    }
+                    setIsModalOpen(false);
+                  }} class="w-full py-2 bg-black text-white text-sm font-bold rounded">確認儲存</button>
+                </div>
+              )}
+
+              {/* B. 【重要核心】課程與日期區間表單 */}
+              {modalType === 'course' && (
+                <div class="space-y-3">
+                  <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">課程名稱</label>
+                    <input type="text" value={courseForm.name} onChange={(e) => setCourseForm({ ...courseForm, name: e.target.value })} placeholder="例如：籃球班、美語會話" class="w-full p-2 text-sm muji-input rounded" />
+                  </div>
+                  
+                  <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">期數 / 梯次班別</label>
+                    <input type="text" value={courseForm.term} onChange={(e) => setCourseForm({ ...courseForm, term: e.target.value })} placeholder="例如：2026春季班、第02期、暑假密集" class="w-full p-2 text-sm muji-input rounded" />
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="block text-xs font-bold text-gray-500 mb-1">上課開始日期</label>
+                      <input type="date" value={courseForm.startDate} onChange={(e) => setCourseForm({ ...courseForm, startDate: e.target.value })} class="w-full p-2 text-xs muji-input rounded" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-gray-500 mb-1">上課結束日期</label>
+                      <input type="date" value={courseForm.endDate} onChange={(e) => setCourseForm({ ...courseForm, endDate: e.target.value })} class="w-full p-2 text-xs muji-input rounded" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 flex justify-between items-center">
+                      <span>固定上課星期與時間</span>
+                      <button type="button" onClick={() => setCourseForm({ ...courseForm, schedules: [...courseForm.schedules, { day: 1, startTime: '16:00', endTime: '17:30' }] })} class="text-blue-600 hover:underline text-[11px]">+ 增加時段</button>
+                    </label>
+                    <div class="space-y-2 mt-1 max-h-32 overflow-y-auto border p-2 bg-gray-50 rounded">
+                      {courseForm.schedules.map((item, idx) => (
+                        <div key={idx} class="flex items-center gap-1.5 text-xs">
+                          <select value={item.day} onChange={(e) => {
+                            const nextS = [...courseForm.schedules];
+                            nextS[idx].day = parseInt(e.target.value);
+                            setCourseForm({ ...courseForm, schedules: nextS });
+                          }} class="p-1 muji-input rounded">
+                            {[1,2,3,4,5,6,0].map(d => <option key={d} value={d}>週{DAYS_SHORT[d]}</option>)}
+                          </select>
+                          <input type="time" value={item.startTime} onChange={(e) => {
+                            const nextS = [...courseForm.schedules];
+                            nextS[idx].startTime = e.target.value;
+                            setCourseForm({ ...courseForm, schedules: nextS });
+                          }} class="p-0.5 border rounded" />
+                          <span>~</span>
+                          <input type="time" value={item.endTime} onChange={(e) => {
+                            const nextS = [...courseForm.schedules];
+                            nextS[idx].endTime = e.target.value;
+                            setCourseForm({ ...courseForm, schedules: nextS });
+                          }} class="p-0.5 border rounded" />
+                          {courseForm.schedules.length > 1 && (
+                            <button type="button" onClick={() => setCourseForm({ ...courseForm, schedules: courseForm.schedules.filter((_, i) => i !== idx) })} class="text-red-500 font-bold px-1">×</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">指定可相互跨班請假補課的期數科目</label>
+                    <div class="grid grid-cols-2 gap-1 max-h-24 overflow-y-auto border p-2 bg-gray-50 rounded text-xs">
+                      {courses.filter(c => c.id !== editingItem?.id).map(c => {
+                        const isChecked = courseForm.crossMakeupCourseIds.includes(c.id);
+                        return (
+                          <label key={c.id} class="flex items-center gap-1 cursor-pointer truncate">
+                            <input type="checkbox" checked={isChecked} onChange={() => {
+                              const nextIds = isChecked ? courseForm.crossMakeupCourseIds.filter(id => id !== c.id) : [...courseForm.crossMakeupCourseIds, c.id];
+                              setCourseForm({ ...courseForm, crossMakeupCourseIds: nextIds });
+                            }} />
+                            <span class="truncate">{c.name}({c.term})</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <button onClick={handleSaveCourse} class="w-full py-2 bg-black text-white text-sm font-bold rounded pt-2">確認提交儲存</button>
+                </div>
+              )}
+
+              {/* C. 選課對應表單 */}
+              {modalType === 'enroll' && (
+                <div class="space-y-3">
+                  <div class="text-sm font-bold">學員：{students.find(s => s.id === enrollForm.studentIds[0])?.name}</div>
+                  <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">勾選欲選修的開課期數 (包含日期區間)</label>
+                    <div class="space-y-1.5 max-h-60 overflow-y-auto border p-2 rounded text-xs">
+                      {sortedCourses.map(c => {
+                        const student = students.find(s => s.id === enrollForm.studentIds[0]);
+                        const isEnrolled = student?.courses.includes(c.id);
+                        return (
+                          <label key={c.id} class="flex items-start gap-2 p-1 hover:bg-gray-50 cursor-pointer">
+                            <input type="checkbox" defaultChecked={isEnrolled} onChange={(e) => {
+                              const sId = enrollForm.studentIds[0];
+                              if (e.target.checked) {
+                                setStudents(students.map(s => s.id === sId ? { ...s, courses: [...s.courses, c.id] } : s));
+                              } else {
+                                setStudents(students.map(s => s.id === sId ? { ...s, courses: s.courses.filter(id => id !== c.id) } : s));
+                              }
+                            }} class="mt-0.5" />
+                            <div>
+                              <div class="font-bold text-gray-800">{c.name} <span class="text-blue-600">({c.term})</span></div>
+                              <div class="text-gray-400 text-[10px]">時段: {c.schedule.map(s => `週${DAYS_SHORT[s.day]}`).join(', ')} | 區間: {c.startDate}~{c.endDate}</div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <button onClick={() => setIsModalOpen(false)} class="w-full py-2 bg-black text-white text-sm font-bold rounded">完成關閉</button>
+                </div>
+              )}
+
+              {/* D. 請假登記 */}
+              {modalType === 'leave' && (
+                <div class="space-y-3 text-xs">
+                  <div>
+                    <label class="block font-bold text-gray-500 mb-1">選擇學生</label>
+                    <select value={leaveForm.studentId} onChange={(e) => setLeaveForm({ ...leaveForm, studentId: e.target.value })} class="w-full p-2 muji-input rounded text-sm">
+                      <option value="">-- 請選擇學員 --</option>
+                      {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block font-bold text-gray-500 mb-1">指定請假日期</label>
+                    <input type="date" value={leaveForm.tempDate} onChange={(e) => setLeaveForm({ ...leaveForm, tempDate: e.target.value })} class="w-full p-2 muji-input rounded text-sm" />
+                  </div>
+                  <div>
+                    <label class="block font-bold text-gray-500 mb-1">選擇請假課程期數</label>
+                    <select value={leaveForm.courseId} onChange={(e) => setLeaveForm({ ...leaveForm, courseId: e.target.value })} class="w-full p-2 muji-input rounded text-sm">
+                      <option value="all_courses_today">該學員當天符合之所有選課</option>
+                      {leaveForm.studentId && students.find(s => s.id === leaveForm.studentId)?.courses.map(cid => {
+                        const c = courses.find(item => item.id === cid);
+                        return c ? <option key={cid} value={cid}>{getCourseFullName(c)}</option> : null;
+                      })}
+                    </select>
+                  </div>
+                  <button onClick={() => {
+                    if (!leaveForm.studentId || !leaveForm.tempDate) return alert('請完整選擇學員與日期');
+                    const targetStudent = students.find(s => s.id === leaveForm.studentId);
+                    if (!targetStudent) return;
+
+                    let cIds = [];
+                    if (leaveForm.courseId === 'all_courses_today') {
+                      const dayIdx = new Date(leaveForm.tempDate).getDay();
+                      cIds = targetStudent.courses.filter(cid => {
+                        const c = courses.find(item => item.id === cid);
+                        if (!c) return false;
+                        if (c.startDate && leaveForm.tempDate < c.startDate) return false;
+                        if (c.endDate && leaveForm.tempDate > c.endDate) return false;
+                        return c.schedule.some(s => s.day === dayIdx);
+                      });
+                    } else {
+                      cIds = [leaveForm.courseId];
+                    }
+
+                    if (cIds.length === 0) return alert('此日期與條件下找不到對應的修課期數範圍！');
+
+                    const newLeaves = cIds.map(cid => ({
+                      id: 'l_' + Date.now() + Math.random().toString(36).substr(2, 4),
+                      studentId: leaveForm.studentId,
+                      courseId: cid,
+                      date: leaveForm.tempDate,
+                      type: 'leave',
+                      status: 'pending'
+                    }));
+
+                    setLeaves([...leaves, ...newLeaves]);
+                    setIsModalOpen(false);
+                  }} class="w-full py-2 bg-black text-white text-sm font-bold rounded">儲存請假紀錄</button>
+                </div>
+              )}
+
+              {/* E. 安排補課 */}
+              {modalType === 'makeup' && (
+                <div class="space-y-3 text-xs">
+                  <div>
+                    <label class="block font-bold text-gray-500 mb-1">選擇補課學生</label>
+                    <select value={makeupForm.studentId} onChange={(e) => setMakeupForm({ ...makeupForm, studentId: e.target.value })} class="w-full p-2 muji-input rounded text-sm">
+                      <option value="">-- 請選擇學員 --</option>
+                      {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block font-bold text-gray-500 mb-1">指定補課日期</label>
+                    <input type="date" value={makeupForm.date} onChange={(e) => setMakeupForm({ ...makeupForm, date: e.target.value })} class="w-full p-2 muji-input rounded text-sm" />
+                  </div>
+                  <div>
+                    <label class="block font-bold text-gray-500 mb-1">補入之課程期數（今日開課且在有效區間內）</label>
+                    <select value={makeupForm.courseId} onChange={(e) => setMakeupForm({ ...makeupForm, courseId: e.target.value })} class="w-full p-2 muji-input rounded text-sm">
+                      <option value="">-- 請選擇目標期數 --</option>
+                      {sortedCourses.filter(c => {
+                        if (c.startDate && makeupForm.date < c.startDate) return false;
+                        if (c.endDate && makeupForm.date > c.endDate) return false;
+                        const dIdx = new Date(makeupForm.date).getDay();
+                        return c.schedule.some(s => s.day === dIdx);
+                      }).map(c => (
+                        <option key={c.id} value={c.id}>{getCourseFullName(c)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button onClick={() => {
+                    if (!makeupForm.studentId || !makeupForm.date || !makeupForm.courseId) return alert('請填寫完整資訊');
+                    const newM = {
+                      id: 'l_' + Date.now(),
+                      studentId: makeupForm.studentId,
+                      courseId: makeupForm.courseId,
+                      date: makeupForm.date,
+                      type: 'makeup',
+                      status: 'completed'
+                    };
+                    setLeaves([...leaves, newM]);
+                    setIsModalOpen(false);
+                  }} class="w-full py-2 bg-black text-white text-sm font-bold rounded">確認安排補課</button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      };
+
+      // 二次確認刪除視窗
+      const renderConfirmModal = () => {
+        if (!isConfirmOpen) return null;
+        return (
+          <div class="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <div class="bg-white w-full max-w-xs muji-card p-4 space-y-3 text-center">
+              <h4 class="font-black text-base text-red-600">確定執行刪除？</h4>
+              <p class="text-xs text-gray-500">此項刪除動作將無法復原，與之關聯的對應選課或請假狀態也可能一併清除。</p>
+              <div class="flex gap-2 pt-2">
+                <button onClick={() => setIsConfirmOpen(false)} class="flex-1 py-1.5 border rounded font-bold text-xs">取消</button>
+                <button onClick={handleConfirmDelete} class="flex-1 py-1.5 bg-red-600 text-white font-bold text-xs rounded">確定刪除</button>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // 備份匯出 JSON
+      const exportData = () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ students, courses, leaves }));
         const downloadAnchor = document.createElement('a');
         downloadAnchor.setAttribute("href", dataStr);
-        downloadAnchor.setAttribute("download", `補課系統資料備份_${targetDate}.json`);
+        downloadAnchor.setAttribute("download", `補習班備份資料_${targetDate}.json`);
         document.body.appendChild(downloadAnchor);
         downloadAnchor.click();
         downloadAnchor.remove();
       };
 
-      const handleImportData = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.readAsText(file, "UTF-8");
-        reader.onload = (evt) => {
+      // 備份匯入 JSON
+      const importData = (e) => {
+        const fileReader = new FileReader();
+        fileReader.onload = (event) => {
           try {
-            const parsed = JSON.parse(evt.target.result);
+            const parsed = JSON.parse(event.target.result);
             if (parsed.students && parsed.courses && parsed.leaves) {
-              if (confirm(`已偵測到備份檔！\n將覆蓋此裝置目前的所有資料，確定要覆蓋匯入嗎？`)) {
-                setStudents(parsed.students);
-                setCourses(parsed.courses);
-                setLeaves(parsed.leaves);
-                setSelectedCourseId(null);
-                alert("🎉 資料打包匯入成功！不需重新建置基本資料。");
-              }
-            } else { alert("❌ 匯入失敗：格式不符。"); }
-          } catch (err) { alert("❌ 讀取檔案時發生錯誤。"); }
+              setStudents(parsed.students);
+              setCourses(parsed.courses.map(c => ({
+                ...c,
+                term: c.term || '常態班',
+                startDate: c.startDate || '2026-01-01',
+                endDate: c.endDate || '2026-12-31'
+              })));
+              setLeaves(parsed.leaves);
+              alert('📦 資料匯入成功！');
+            } else {
+              alert('格式不符，匯入失敗');
+            }
+          } catch (err) {
+            alert('檔案讀取失敗');
+          }
         };
-        e.target.value = '';
+        if(e.target.files[0]) fileReader.readAsText(e.target.files[0]);
       };
 
-      // 取消已核銷的補課登記，重新放回待補課追蹤名單
-      const handleCancelMakeup = (leaveId) => {
-        if (confirm("確定要取消此筆補課登記，將此學生移回「待辦補課」追蹤名單嗎？\n(此動作會清除實際補課日期與班級，保留原始請假紀錄)")) {
-          setLeaves(prev => prev.map(l => {
-            if (l.id === leaveId) {
-              return { id: l.id, studentId: l.studentId, courseId: l.courseId, date: l.date, status: 'pending' };
-            }
-            return l;
-          }));
-        }
-      };
-
-      // 【全新核心功能】：在今日看板直接取消請假，將資料抹除
-      const handleCancelLeave = (studentId, date, courseId = null) => {
-        setLeaves(prev => prev.filter(l => {
-          const matchStudent = l.studentId === studentId;
-          const matchDate = l.date === date;
-          const matchCourse = courseId ? l.courseId === courseId : true;
-          // 若同時符合這三個條件，代表是要被刪除的請假紀錄，故回傳 false 將其過濾掉
-          return !(matchStudent && matchDate && matchCourse);
-        }));
-      };
-
-      const openDeleteConfirm = (type, id) => { setDeleteTarget({ type, id }); setIsConfirmOpen(true); };
-      const handleExecuteDelete = () => {
-        const { type, id } = deleteTarget;
-        if (type === 'student') {
-          setStudents(prev => prev.filter(s => s.id !== id));
-          setLeaves(prev => prev.filter(l => l.studentId !== id));
-        } else if (type === 'course') {
-          setCourses(prev => prev.filter(c => c.id !== id));
-          setStudents(prev => prev.map(s => ({ ...s, courses: s.courses ? s.courses.filter(cid => cid !== id) : [] })));
-          setLeaves(prev => prev.filter(l => l.courseId !== id));
-        } else if (type === 'clear_all') {
-          localStorage.clear(); setStudents([]); setCourses([]); setLeaves([]); setSelectedCourseId(null);
-        }
-        setIsConfirmOpen(false); setDeleteTarget({ type: '', id: null });
-      };
-
-      const handleUnenroll = (studentId, courseId) => {
-        setStudents(prev => prev.map(s => s.id === studentId ? { ...s, courses: s.courses ? s.courses.filter(cid => cid !== courseId) : [] } : s));
-      };
-
-      const saveStudentData = () => {
-        if (studentForm.batchNames) {
-          const names = studentForm.batchNames.split('\n').filter(n => n.trim());
-          const newSts = names.map((name, i) => ({ id: `s_${Date.now()}_${i}`, name: name.trim(), courses: [] }));
-          setStudents(prev => [...prev, ...newSts]);
-        } else if (studentForm.name.trim()) {
-          setStudents(prev => [...prev, { id: `s_${Date.now()}`, name: studentForm.name.trim(), courses: [] }]);
-        }
-        closeModal();
-      };
-
-      const saveCourseData = () => {
-        if (!courseForm.name.trim()) return;
-        const sortedSchedules = [...courseForm.schedules].sort((a, b) => {
-          if (a.day !== b.day) return a.day - b.day;
-          return a.startTime.localeCompare(b.startTime);
-        });
-        if (editingItem) {
-          setCourses(prev => prev.map(c => c.id === editingItem.id ? { ...c, name: courseForm.name.trim(), schedule: sortedSchedules, crossMakeupCourseIds: courseForm.crossMakeupCourseIds } : c));
-        } else {
-          setCourses(prev => [...prev, { id: `c_${Date.now()}`, name: courseForm.name.trim(), schedule: sortedSchedules, crossMakeupCourseIds: courseForm.crossMakeupCourseIds }]);
-        }
-        closeModal();
-      };
-
-      const handleAddQuickCourse = () => {
-        if (!quickCourseName.trim()) return;
-        setCourses(prev => [...prev, { id: `c_${Date.now()}`, name: quickCourseName.trim(), schedule: [{ day: 1, startTime: '16:00', endTime: '17:30' }], crossMakeupCourseIds: [] }]);
-        setQuickCourseName('');
-      };
-
-      const saveEnrollment = () => {
-        if (enrollForm.studentIds.length === 0 || enrollForm.courseIds.length === 0) return;
-        setStudents(prev => prev.map(s => {
-          if (enrollForm.studentIds.includes(s.id)) {
-            return { ...s, courses: Array.from(new Set([...(s.courses || []), ...enrollForm.courseIds])) };
-          }
-          return s;
-        }));
-        closeModal();
-      };
-
-      const saveLeaveData = () => {
-        if (!leaveForm.studentId || !leaveForm.courseId || leaveForm.dates.length === 0) return;
-        const newLvs = [];
-        const studentObj = students.find(s => s.id === leaveForm.studentId);
-        if (!studentObj) return;
-
-        leaveForm.dates.forEach(date => {
-          const currentDayIdx = new Date(date).getDay();
-          if (leaveForm.courseId === 'all_courses_today') {
-            const todayCoursesForSt = sortedCourses.filter(c => studentObj.courses?.includes(c.id) && c.schedule?.some(s => s.day === currentDayIdx));
-            todayCoursesForSt.forEach(c => {
-              if (!leaves.some(l => l.studentId === leaveForm.studentId && l.courseId === c.id && l.date === date)) {
-                newLvs.push({ id: `l_${Date.now()}_${Math.random()}`, studentId: leaveForm.studentId, courseId: c.id, date, status: 'pending' });
-              }
-            });
-          } else {
-            if (!leaves.some(l => l.studentId === leaveForm.studentId && l.courseId === leaveForm.courseId && l.date === date)) {
-              newLvs.push({ id: `l_${Date.now()}_${Math.random()}`, studentId: leaveForm.studentId, courseId: leaveForm.courseId, date, status: 'pending' });
-            }
-          }
-        });
-        if (newLvs.length > 0) setLeaves(prev => [...prev, ...newLvs]);
-        closeModal();
-      };
-
-      const handleDashboardQuickLeave = (student, mode) => {
-        const newLvs = [];
-        if (mode === 'single' && selectedCourseId) {
-          if (!leaves.some(l => l.studentId === student.id && l.courseId === selectedCourseId && l.date === targetDate)) {
-            newLvs.push({ id: `l_ds_${Date.now()}`, studentId: student.id, courseId: selectedCourseId, date: targetDate, status: 'pending' });
-          }
-        } else {
-          const sTodayClasses = todayCoursesSorted.filter(tc => student.courses?.includes(tc.id));
-          sTodayClasses.forEach((tc, idx) => {
-            if (!leaves.some(l => l.studentId === student.id && l.courseId === tc.id && l.date === targetDate)) {
-              newLvs.push({ id: `l_da_${Date.now()}_${idx}`, studentId: student.id, courseId: tc.id, date: targetDate, status: 'pending' });
-            }
-          });
-        }
-        if (newLvs.length > 0) setLeaves(prev => [...prev, ...newLvs]);
-      };
-
-      const saveMakeupCompletion = () => {
-        if (!editingItem || !makeupForm.date || !makeupForm.courseId) return;
-        setLeaves(prev => prev.map(l => l.id === editingItem.id ? { ...l, status: 'completed', makeupDate: makeupForm.date, makeupCourseId: makeupForm.courseId } : l));
-        closeModal();
-      };
-
-      const openModal = (type, item = null) => {
-        setModalType(type); setEditingItem(item);
-        if (type === 'student') setStudentForm({ name: '', batchNames: '' });
-        if (type === 'course') {
-          if (item) setCourseForm({ name: item.name, schedules: item.schedule, crossMakeupCourseIds: item.crossMakeupCourseIds || [] });
-          else setCourseForm({ name: '', schedules: [{ day: 1, startTime: '16:00', endTime: '17:30' }], crossMakeupCourseIds: [] });
-        }
-        if (type === 'enroll') setEnrollForm({ studentIds: item ? [item.id] : [], courseIds: [] });
-        if (type === 'leave') setLeaveForm({ studentId: item ? item.id : '', courseId: 'all_courses_today', tempDate: targetDate, startDate: targetDate, endDate: targetDate, dates: [targetDate] });
-        if (type === 'completeMakeup') {
-          const opts = getMakeupOptions(item.courseId);
-          setMakeupForm({ date: new Date().toISOString().split('T')[0], courseId: opts.length > 0 ? opts[0].courseId : item.courseId });
-        }
-        setIsModalOpen(true);
-      };
-
-      const closeModal = () => { setIsModalOpen(false); setModalType(''); setEditingItem(null); };
-
-      const filteredStudents = useMemo(() => {
-        return students.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()));
-      }, [students, studentSearch]);
-
-      // ==========================================
-      // 🎯 【今日看板】視圖
-      // ==========================================
-      const renderDashboardView = () => (
-        <div className="space-y-4">
-          <div className="muji-card p-4 bg-white flex flex-col items-center justify-between gap-3 sm:flex-row">
-            <div className="text-center sm:text-left">
-              <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Today's Schedule</div>
-              <h2 className="text-base font-black mt-0.5 flex items-center gap-1.5"><Icons.Calendar />本日班級出席看板</h2>
-            </div>
-            <div className="flex items-center justify-between w-full sm:w-auto gap-2 bg-[#f5f5f4] p-1 rounded-md border border-gray-300">
-              <button onClick={() => adjustTargetDate(-1)} className="px-3 py-2 bg-white muji-border rounded text-xs font-bold shadow-xs active:bg-gray-100">← 前一天</button>
-              <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)} className="bg-transparent font-black text-xs text-center outline-none w-28 px-1" />
-              <button onClick={() => adjustTargetDate(1)} className="px-3 py-2 bg-white muji-border rounded text-xs font-bold shadow-xs active:bg-gray-100">後一天 →</button>
-            </div>
-          </div>
-
-          <div className="muji-card p-4 space-y-3">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xs font-black text-gray-400 tracking-wider">今日開課時段 (點選課程進行單項過濾點名)</h3>
-              {selectedCourseId && (
-                <button onClick={() => setSelectedCourseId(null)} className="text-[10px] text-red-600 border border-red-300 bg-red-50 px-1.5 py-0.5 rounded font-black">清除過濾</button>
-              )}
-            </div>
-            {todayCoursesSorted.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-4 italic">本日 ({DAYS_FULL[targetDayIndex]}) 無任何科目排程</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => setSelectedCourseId(null)} className={`text-xs font-bold px-3 py-1.5 rounded transition border ${!selectedCourseId ? 'bg-[#222222] text-white border-black shadow-xs' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
-                  全部課程 ({todayAllStudents.length}人)
-                </button>
-                {todayCoursesSorted.map(tc => {
-                  const sSlot = tc.schedule.find(s => s.day === targetDayIndex);
-                  const isSelected = selectedCourseId === tc.id;
-                  const count = students.filter(s => s.courses?.includes(tc.id)).length;
-                  return (
-                    <button key={tc.id} onClick={() => setSelectedCourseId(isSelected ? null : tc.id)} className={`text-xs font-bold px-3 py-1.5 rounded transition border flex items-center gap-1.5 ${isSelected ? 'bg-orange-600 text-white border-orange-700 shadow-md scale-105 font-black' : 'bg-white text-gray-800 border-[#222222] hover:bg-neutral-50 shadow-xs'}`}>
-                      <span>{tc.name}</span>
-                      <span className={`text-[10px] opacity-90 px-1 rounded ${isSelected ? 'bg-orange-800' : 'bg-gray-100 text-gray-600'}`}>{sSlot?.startTime} ({count}人)</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="muji-card overflow-hidden">
-            <div className="p-3 bg-gray-50 border-b-2 border-[#222222] flex justify-between items-center">
-              <h3 className="text-xs font-black">
-                {selectedCourseId ? `🔍 正在檢視【${courses.find(c=>c.id===selectedCourseId)?.name}】學生名單` : `📋 本日全部上課學生簽到總表`}
-              </h3>
-              <span className="text-[10px] bg-[#222222] text-white px-2 py-0.5 rounded font-black">顯示 {displayStudentsOnDashboard.length} 人</span>
-            </div>
-            <div className="divide-y divide-gray-200">
-              {displayStudentsOnDashboard.map(s => {
-                const sTodayClasses = todayCoursesSorted.filter(tc => s.courses?.includes(tc.id));
-                const checkClassLeaveStatus = (cid) => leaves.some(l => l.studentId === s.id && l.courseId === cid && l.date === targetDate);
-                const isAllLeave = sTodayClasses.every(tc => checkClassLeaveStatus(tc.id));
-                const hasAnyLeave = sTodayClasses.some(tc => checkClassLeaveStatus(tc.id));
-                
-                return (
-                  <div key={s.id} className="p-3 bg-white flex justify-between items-center hover:bg-gray-50/50 transition">
-                    <div className="flex-1 pr-2">
-                      <div className="font-bold text-sm text-gray-900">{s.name}</div>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {sTodayClasses.map(tc => {
-                          const hasLeft = checkClassLeaveStatus(tc.id);
-                          return (
-                            <span 
-                              key={tc.id} 
-                              onClick={() => { if(hasLeft) handleCancelLeave(s.id, targetDate, tc.id); }}
-                              className={`text-[10px] px-1.5 py-0.5 rounded font-medium border flex items-center transition ${hasLeft ? 'bg-red-50 text-red-500 border-red-200 line-through cursor-pointer hover:bg-red-100' : 'bg-gray-50 text-gray-600 border-gray-200'}`}
-                              title={hasLeft ? "點擊直接取消此科目請假" : ""}
-                            >
-                              {tc.name} {hasLeft && ' (已假 ✕)'}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    
-                    {/* 右側操作面板：完美整合取消請假與快速請假機制 */}
-                    {selectedCourseId ? (
-                      checkClassLeaveStatus(selectedCourseId) ? (
-                        <div className="flex flex-col items-end gap-1">
-                          <span className="text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">本堂已請假</span>
-                          <button onClick={() => handleCancelLeave(s.id, targetDate, selectedCourseId)} className="text-[10px] font-bold text-gray-500 border border-gray-300 hover:border-red-300 bg-white px-2 py-0.5 rounded transition flex items-center gap-0.5 active:scale-95 shadow-xs">
-                            <Icons.Undo />取消請假
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => handleDashboardQuickLeave(s, 'single')} className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 px-2.5 py-1.5 rounded active:scale-95 transition">此課程請假</button>
-                      )
-                    ) : (
-                      isAllLeave ? (
-                        <div className="flex flex-col items-end gap-1">
-                          <span className="text-[10px] font-black text-neutral-500 bg-neutral-50 border border-neutral-200 px-1.5 py-0.5 rounded">今日已全假</span>
-                          <button onClick={() => handleCancelLeave(s.id, targetDate)} className="text-[10px] font-bold text-gray-500 border border-gray-300 hover:border-red-300 bg-white px-2 py-0.5 rounded transition flex items-center gap-0.5 active:scale-95 shadow-xs">
-                            <Icons.Undo />取消全假
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-end gap-1">
-                          <button onClick={() => handleDashboardQuickLeave(s, 'all')} className="text-[11px] font-bold text-orange-700 bg-orange-50 border border-orange-200 hover:bg-orange-100 px-2.5 py-1.5 rounded active:scale-95 transition">當日全課請假</button>
-                          {hasAnyLeave && (
-                            <button onClick={() => handleCancelLeave(s.id, targetDate)} className="text-[10px] font-bold text-red-600 hover:underline transition flex items-center gap-0.5 mt-0.5">
-                              <Icons.Undo />還原今日所有請假
-                            </button>
-                          )}
-                        </div>
-                      )
-                    )}
-                  </div>
-                );
-              })}
-              {displayStudentsOnDashboard.length === 0 && <p className="text-xs text-gray-400 text-center py-8 italic">此過濾條件下無任何學生</p>}
-            </div>
-          </div>
-        </div>
-      );
-
-      // ==========================================
-      // 👥 【學生選課】視圖
-      // ==========================================
-      const renderStudentsView = () => (
-        <div className="space-y-3">
-          <div className="muji-card p-4 bg-white space-y-3">
-            <div className="flex justify-between items-center">
-              <div>
-                <div className="text-[10px] font-bold text-gray-400 uppercase">Roster Management</div>
-                <h2 className="text-base font-black mt-0.5">學生選課名冊系統</h2>
-              </div>
-              <button onClick={() => openModal('student')} className="px-3 py-2 bg-[#222222] text-white font-bold text-xs rounded flex items-center gap-1 active:opacity-90"><Icons.Plus />新增學生</button>
-            </div>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-3 flex items-center text-gray-400"><Icons.Search /></span>
-              <input type="text" placeholder="輸入名字即時篩選學生..." value={studentSearch} onChange={e => setStudentSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 text-xs muji-input rounded-md font-medium" />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {filteredStudents.map(s => {
-              const isExpanded = expandedStudentId === s.id;
-              return (
-                <div key={s.id} className="muji-card overflow-hidden bg-white transition-all duration-200">
-                  <div onClick={() => setExpandedStudentId(isExpanded ? null : s.id)} className="p-3.5 flex justify-between items-center cursor-pointer select-none hover:bg-gray-50">
-                    <div>
-                      <span className="font-black text-sm text-gray-900">{s.name}</span>
-                      <span className="ml-2 text-[11px] bg-gray-100 px-2 py-0.5 rounded text-gray-500 font-bold">已選 {s.courses?.length || 0} 科</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-gray-400">{isExpanded ? <Icons.ChevronUp /> : <Icons.ChevronDown />}</div>
-                  </div>
-                  {isExpanded && (
-                    <div className="bg-[#fafaf9] border-t border-gray-200 p-4 space-y-4 text-xs">
-                      <div>
-                        <span className="block text-gray-400 font-bold mb-1.5">目前已註冊修讀科目：</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {s.courses && s.courses.length > 0 ? (
-                            s.courses.map(cid => {
-                              const cObj = courses.find(c => c.id === cid);
-                              if (!cObj) return null;
-                              return (
-                                <span key={cid} className="inline-flex items-center gap-1.5 bg-white border border-gray-400 px-2.5 py-1 rounded-md text-[11px] font-black shadow-xs">
-                                  {cObj.name}
-                                  <button onClick={(e) => { e.stopPropagation(); handleUnenroll(s.id, cid); }} className="text-red-500 hover:bg-red-50 p-0.5 rounded transition"><Icons.X /></button>
-                                </span>
-                              );
-                            })
-                          ) : <span className="text-gray-400 italic">尚未註冊任何科目</span>}
-                        </div>
-                      </div>
-                      <div className="pt-3 border-t border-gray-200 flex justify-between items-center gap-2">
-                        <button onClick={() => openDeleteConfirm('student', s.id)} className="p-2 text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 rounded-md transition"><Icons.Trash /></button>
-                        <div className="flex gap-1.5">
-                          <button onClick={() => openModal('enroll', s)} className="px-3 py-2 bg-white border border-[#222222] font-black rounded-md shadow-xs active:bg-gray-50">辦理選課</button>
-                          <button onClick={() => openModal('leave', s)} className="px-3 py-2 bg-orange-50 text-orange-700 border border-orange-300 font-black rounded-md shadow-xs active:bg-orange-100">登記請假</button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-
-      // ==========================================
-      // 📖 【課表排程】視圖
-      // ==========================================
-      const renderCoursesView = () => (
-        <div className="space-y-3">
-          <div className="muji-card p-4 bg-white space-y-2">
-            <label className="block text-xs font-black text-gray-500">快速建立基礎科目名稱</label>
-            <div className="flex gap-2">
-              <input type="text" placeholder="輸入新科目名稱..." value={quickCourseName} onChange={e => setQuickCourseName(e.target.value)} className="flex-1 p-2 text-xs muji-input rounded-md" />
-              <button onClick={handleAddQuickCourse} className="px-4 py-2 bg-[#222222] text-white font-bold text-xs rounded-md active:opacity-90">新增</button>
-            </div>
-          </div>
-
-          <div className="muji-card bg-white overflow-hidden">
-            <div className="p-3.5 bg-gray-50 border-b-2 border-[#222222] flex justify-between items-center">
-              <div>
-                <h3 className="text-xs font-black">現有科目規律排程</h3>
-                <p className="text-[10px] text-gray-400">設定精確的星期、上下課時段</p>
-              </div>
-              <button onClick={() => openModal('course')} className="px-2.5 py-1.5 bg-white border border-[#222222] text-xs font-bold rounded shadow-xs flex items-center gap-1"><Icons.Plus />細節時段設定</button>
-            </div>
-            <div className="p-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {sortedCourses.map(c => (
-                <div key={c.id} className="p-3.5 border border-[#222222] rounded-lg bg-white relative">
-                  <div className="absolute top-2.5 right-2.5 flex gap-1">
-                    <button onClick={() => openModal('course', c)} className="p-1 text-gray-500 hover:text-blue-600 rounded transition"><Icons.Edit /></button>
-                    <button onClick={() => openDeleteConfirm('course', c.id)} className="p-1 text-gray-400 hover:text-red-600 rounded transition"><Icons.Trash /></button>
-                  </div>
-                  <h4 className="font-black text-base text-gray-900 pr-12">{c.name}</h4>
-                  <div className="text-[11px] mt-2.5 space-y-1 bg-gray-50 p-2 border border-gray-200 rounded">
-                    <span className="text-[10px] text-gray-400 block font-bold">每週上課時段：</span>
-                    {c.schedule?.map((s, idx) => (
-                      <div key={idx} className="font-bold text-gray-700">📅 星期{DAYS_SHORT[s.day]} • {s.startTime} ~ {s.endTime}</div>
-                    ))}
-                  </div>
-                  <div className="text-[11px] mt-2 text-indigo-800">
-                    <span className="text-[10px] text-gray-400 block">此科目允許相互補課對象：</span>
-                    <span className="font-black">
-                      {c.crossMakeupCourseIds && c.crossMakeupCourseIds.length > 0
-                        ? c.crossMakeupCourseIds.map(cid => courses.find(co => co.id === cid)?.name).filter(Boolean).join(', ')
-                        : '未連結互補科目'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-
-      // ==========================================
-      // 📅 【請假補課】視圖
-      // ==========================================
-      const renderLeavesView = () => (
-        <div className="space-y-4">
-          <div className="muji-card border-orange-600 bg-white overflow-hidden">
-            <div className="p-3.5 bg-orange-50 border-b-2 border-orange-600 flex justify-between items-center">
-              <div>
-                <h3 className="text-xs font-black text-orange-950">待辦補課名單追蹤</h3>
-                <p className="text-[10px] text-orange-700/70">尚未進行補課核銷的請假存根</p>
-              </div>
-              <button onClick={() => openModal('leave')} className="px-3 py-1.5 bg-orange-600 text-white text-xs font-bold rounded shadow-xs">登記請假</button>
-            </div>
-            <div className="p-3 space-y-2">
-              {leaves.filter(l => l.status === 'pending').map(l => {
-                const s = students.find(st => st.id === l.studentId);
-                const c = courses.find(co => co.id === l.courseId);
-                const opts = getMakeupOptions(l.courseId);
-                return (
-                  <div key={l.id} className="p-3 border border-gray-300 rounded-md bg-white flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-base">{s?.name}</span>
-                        <span className="text-xs text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded font-bold">{l.date} 請假: {c?.name}</span>
-                      </div>
-                      {opts.length > 0 && (
-                        <p className="text-[11px] text-indigo-700 font-bold mt-1.5">💡 依通則可互補：[{opts.map(o => o.displayText).join(' / ')}]</p>
-                      )}
-                    </div>
-                    <button onClick={() => openModal('completeMakeup', l)} className="px-3 py-2 bg-green-50 text-green-700 border border-green-400 font-black text-xs rounded-md flex items-center gap-1 justify-center active:bg-green-100"><Icons.Check />核銷完成補課</button>
-                  </div>
-                );
-              })}
-              {leaves.filter(l => l.status === 'pending').length === 0 && (
-                <p className="text-xs text-gray-400 text-center py-6 italic">目前沒有任何未核銷的請假紀錄</p>
-              )}
-            </div>
-          </div>
-
-          <div className="muji-card bg-white overflow-hidden">
-            <div className="p-3.5 bg-gray-50 border-b border-gray-200 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-xs font-black">歷史請假明細流水帳</h3>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-2.5 flex items-center text-gray-400"><Icons.Search /></span>
-                <input type="text" placeholder="搜尋學生姓名..." value={leaveSearch} onChange={e => setLeaveSearch(e.target.value)} className="w-full pl-8 pr-3 py-1.5 text-xs muji-input rounded-md" />
-              </div>
-            </div>
-            
-            <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto pr-1">
-              {filteredHistoryLeaves.map(l => (
-                <div key={l.id} className="p-3 text-xs flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold bg-gray-100 px-2 py-0.5 rounded text-gray-600">{l.date}</span>
-                    <span className="font-black text-gray-900">{students.find(st => st.id === l.studentId)?.name}</span>
-                    <span className="text-gray-500">[{courses.find(co => co.id === l.courseId)?.name}] 請假</span>
-                  </div>
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
-                    {l.status === 'completed' ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-green-700 font-bold bg-green-50 px-2 py-0.5 border border-green-200 rounded text-[11px]">
-                          已於 {l.makeupDate} 補修 [{courses.find(co => co.id === l.makeupCourseId)?.name}]
-                        </span>
-                        <button 
-                          onClick={() => handleCancelMakeup(l.id)} 
-                          className="text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded px-2 py-1 font-black text-[10px] flex items-center gap-0.5 transition active:scale-95"
-                          title="取消此筆補課，重新排期"
-                        >
-                          <Icons.Undo />取消補課
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 bg-gray-50 px-2 py-0.5 border border-gray-200 rounded text-[11px]">尚未補課</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {filteredHistoryLeaves.length === 0 && <p className="text-center text-gray-400 text-xs py-6 italic">無相符紀錄</p>}
-            </div>
-          </div>
-
-          <div className="muji-card p-4 bg-stone-50 space-y-3 border-dashed">
+      return ( 
+        <div class="max-w-md mx-auto min-h-screen flex flex-col bg-[#fbfbfa] relative pb-24 shadow-xl border-x border-gray-200/40"> 
+          {/* 上頂導覽列 */} 
+          <header class="bg-white border-b-2 border-black sticky top-0 z-40 px-4 py-3 flex items-center justify-between"> 
             <div>
-              <h4 className="text-xs font-black text-stone-800 flex items-center gap-1">📦 系統維護與跨檔案資料移轉</h4>
-              <p className="text-[10px] text-stone-500 mt-0.5">當您更新網頁 HTML 檔案或換裝置時，可使用此功能一鍵移轉學生與課表基本資料，免除重新建置的麻煩。</p>
+              <h1 class="text-base font-black tracking-wide">學務與請假管理</h1> 
+              <p class="text-[10px] text-gray-400 font-bold tracking-wider uppercase">Classroom & Leave Ecosystem</p>
             </div>
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <button onClick={handleExportData} className="px-3 py-2.5 bg-zinc-800 text-white font-bold text-xs rounded-md shadow-xs flex items-center justify-center gap-1 hover:bg-black active:scale-95 transition">
-                <Icons.Download />打包匯出全部資料
-              </button>
-              <button onClick={() => fileInputRef.current.click()} className="px-3 py-2.5 bg-white text-zinc-800 border-2 border-zinc-800 font-bold text-xs rounded-md shadow-xs flex items-center justify-center gap-1 hover:bg-stone-100 active:scale-95 transition">
-                <Icons.Upload />選擇備份檔匯入
-              </button>
-              <input type="file" ref={fileInputRef} onChange={handleImportData} accept=".json" className="hidden" />
+            <div class="flex gap-2">
+              <button onClick={exportData} title="匯出備份" class="p-1.5 border border-black rounded bg-white hover:bg-gray-50"><Icons.Download /></button>
+              <button onClick={() => fileInputRef.current.click()} title="匯入資料" class="p-1.5 border border-black rounded bg-white hover:bg-gray-50"><Icons.Upload /></button>
+              <input type="file" ref={fileInputRef} onChange={importData} accept=".json" class="hidden" />
             </div>
-            <div className="pt-2 border-t border-stone-200 flex justify-end">
-              <button onClick={() => openDeleteConfirm('clear_all', null)} className="px-3 py-1.5 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition">⚠️ 強制清空瀏覽器本機快取</button>
-            </div>
-          </div>
-        </div>
-      );
-
-      // ==========================================
-      // 🛠️ 全局浮動彈窗面板
-      // ==========================================
-      const renderFormModal = () => {
-        if (!isModalOpen) return null;
-        return (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-xs">
-            <div className="bg-white border-t-2 sm:border-2 border-[#222222] rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
-              <div className="p-3.5 border-b border-[#222222] bg-gray-50 flex justify-between items-center">
-                <h3 className="font-black text-xs text-gray-700">{editingItem ? '✏️ 修改現有設定變更' : '📝 系統資料登記表單'}</h3>
-                <button onClick={closeModal} className="p-1 text-gray-500 hover:bg-gray-200 rounded-full"><Icons.X /></button>
-              </div>
-
-              <div className="p-5 space-y-4 overflow-y-auto max-h-[70vh] text-xs">
-                {modalType === 'student' && (
-                  <div className="space-y-3">
-                    <div><label className="block font-black mb-1">方式一：批量增加學生 (每行輸入一個姓名)</label><textarea rows="3" placeholder="王大明&#10;李小美" className="w-full p-2.5 muji-input rounded-md font-medium" value={studentForm.batchNames} onChange={e => setStudentForm({ ...studentForm, batchNames: e.target.value, name: '' })} /></div>
-                    <div className="text-center font-bold text-gray-400 text-[10px] tracking-widest">- 或 -</div>
-                    <div><label className="block font-black mb-1">方式二：增加單一學生姓名</label><input type="text" placeholder="請輸入姓名..." className="w-full p-2.5 muji-input rounded-md font-medium" value={studentForm.name} onChange={e => setStudentForm({ ...studentForm, name: e.target.value, batchNames: '' })} /></div>
-                  </div>
-                )}
-
-                {modalType === 'course' && (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block font-black mb-1">科目課堂名稱</label>
-                      <input type="text" className="w-full p-2.5 muji-input rounded-md font-medium" value={courseForm.name} onChange={e => setCourseForm({ ...courseForm, name: e.target.value })} />
-                    </div>
-                    <div className="border-t pt-3 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <label className="block font-black text-stone-700">細節規律時段設定 (儲存後自動排序)</label>
-                        <button type="button" onClick={() => setCourseForm({ ...courseForm, schedules: [...courseForm.schedules, { day: 1, startTime: '16:00', endTime: '17:30' }] })} className="px-2 py-1 bg-[#222222] text-white rounded text-[10px] font-black">＋加新時段</button>
-                      </div>
-                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                        {courseForm.schedules?.map((sched, idx) => (
-                          <div key={idx} className="p-3 border border-gray-400 rounded-md bg-stone-50/50 space-y-2 relative">
-                            <div className="absolute top-1.5 right-2 flex gap-2">
-                              <button type="button" onClick={() => { const nextDay = (sched.day + 1) % 7; setCourseForm({ ...courseForm, schedules: [...courseForm.schedules, { ...sched, day: nextDay }] }); }} className="text-indigo-700 hover:bg-indigo-50 px-1 py-0.5 rounded border border-indigo-200 font-bold text-[10px] flex items-center gap-0.5 bg-white shadow-xs">
-                                <Icons.Copy />複製時段
-                              </button>
-                              {courseForm.schedules.length > 1 && (
-                                <button type="button" onClick={() => setCourseForm({ ...courseForm, schedules: courseForm.schedules.filter((_, i) => i !== idx) })} className="text-red-500 font-bold p-0.5"><Icons.X /></button>
-                              )}
-                            </div>
-                            <div className="grid grid-cols-3 gap-1.5 pt-4">
-                              <div>
-                                <label className="block text-[10px] text-gray-400 font-bold mb-0.5">星期</label>
-                                <select className="w-full p-1.5 border bg-white font-bold" value={sched.day} onChange={e => { const sNew = [...courseForm.schedules]; sNew[idx].day = parseInt(e.target.value); setCourseForm({ ...courseForm, schedules: sNew }); }}>
-                                  {DAYS_FULL.map((d, i) => <option key={i} value={i}>{d}</option>)}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-[10px] text-gray-400 font-bold mb-0.5">開始時間</label>
-                                <input type="time" className="w-full p-1 border font-bold" value={sched.startTime} onChange={e => { const sNew = [...courseForm.schedules]; sNew[idx].startTime = e.target.value; setCourseForm({ ...courseForm, schedules: sNew }); }} />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] text-gray-400 font-bold mb-0.5">結束時間</label>
-                                <input type="time" className="w-full p-1 border font-bold" value={sched.endTime} onChange={e => { const sNew = [...courseForm.schedules]; sNew[idx].endTime = e.target.value; setCourseForm({ ...courseForm, schedules: sNew }); }} />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="border-t pt-3">
-                      <label className="block font-black text-indigo-900 mb-1.5">補課通則互通設定：</label>
-                      <div className="p-2.5 border bg-gray-50 rounded-md grid grid-cols-2 gap-2 max-h-24 overflow-y-auto">
-                        {courses.filter(c => !editingItem || c.id !== editingItem.id).map(c => (
-                          <label key={c.id} className="flex items-center font-bold text-gray-700 cursor-pointer">
-                            <input type="checkbox" className="mr-2" checked={courseForm.crossMakeupCourseIds?.includes(c.id)} onChange={e => {
-                              let cIds = [...(courseForm.crossMakeupCourseIds || [])];
-                              if (e.target.checked) cIds.push(c.id); else cIds = cIds.filter(id => id !== c.id);
-                              setCourseForm({ ...courseForm, crossMakeupCourseIds: cIds });
-                            }} />
-                            {c.name}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {modalType === 'enroll' && (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block font-black mb-1">已選學生對象</label>
-                      <div className="max-h-24 overflow-y-auto p-2 border bg-gray-50 space-y-1 rounded-md">
-                        {students.map(s => <label key={s.id} className="flex items-center font-bold text-gray-700"><input type="checkbox" className="mr-2" checked={enrollForm.studentIds.includes(s.id)} onChange={e => setEnrollForm({ ...enrollForm, studentIds: e.target.checked ? [...enrollForm.studentIds, s.id] : enrollForm.studentIds.filter(id => id !== s.id) })} /> {s.name}</label>)}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block font-black mb-1">勾選欲增修註冊的學課科目</label>
-                      <div className="grid grid-cols-2 gap-1.5 max-h-28 overflow-y-auto">
-                        {courses.map(c => <label key={c.id} className="flex items-center p-2 border bg-white rounded-md cursor-pointer"><input type="checkbox" className="mr-2" checked={enrollForm.courseIds.includes(c.id)} onChange={e => setEnrollForm({ ...enrollForm, courseIds: e.target.checked ? [...enrollForm.courseIds, c.id] : enrollForm.courseIds.filter(id => id !== c.id) })} /> <span className="truncate font-bold">{c.name}</span></label>)}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {modalType === 'leave' && (
-                  <div className="space-y-3">
-                    <div><label className="block font-black mb-1">請假學生</label><select className="w-full p-2.5 border bg-white font-black rounded-md" value={leaveForm.studentId} onChange={e => setLeaveForm({ ...leaveForm, studentId: e.target.value })}><option value="" disabled>-- 請選擇學生 --</option>{students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-                    {leaveForm.studentId && (
-                      <div>
-                        <label className="block font-black mb-1">請假課堂</label>
-                        <select className="w-full p-2.5 border bg-white font-black text-red-600 rounded-md" value={leaveForm.courseId} onChange={e => setLeaveForm({ ...leaveForm, courseId: e.target.value })}>
-                          <option value="all_courses_today">-- 當天所有修讀科目 (一鍵全請) --</option>
-                          {students.find(s => s.id === leaveForm.studentId)?.courses?.map(cid => (
-                            <option key={cid} value={cid} className="text-gray-900">{courses.find(c => c.id === cid)?.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    <div className="border-t pt-3 space-y-3">
-                      <div>
-                        <label className="block font-black text-gray-700">追加特定請假日期</label>
-                        <div className="flex gap-2 mt-1">
-                          <input type="date" className="flex-1 p-2 border rounded-md" value={leaveForm.tempDate} onChange={e => setLeaveForm({ ...leaveForm, tempDate: e.target.value })} />
-                          <button type="button" onClick={() => { if(leaveForm.tempDate && !leaveForm.dates.includes(leaveForm.tempDate)) setLeaveForm({...leaveForm, dates: [...leaveForm.dates, leaveForm.tempDate].sort()}) }} className="px-3 py-1.5 bg-gray-200 border border-[#222222] font-black rounded-md">＋加入</button>
-                        </div>
-                      </div>
-                      <div className="bg-stone-50 p-2.5 border border-dashed border-gray-400 rounded-lg space-y-2">
-                        <label className="block font-black text-gray-600 text-[11px]">大範圍連續請假區間帶入</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div><span className="text-[10px] text-gray-400 font-bold block">區間起始日</span><input type="date" className="w-full p-1.5 border bg-white rounded text-xs" value={leaveForm.startDate} onChange={e => setLeaveForm({ ...leaveForm, startDate: e.target.value })} /></div>
-                          <div><span className="text-[10px] text-gray-400 font-bold block">區間截止日</span><input type="date" className="w-full p-1.5 border bg-white rounded text-xs" value={leaveForm.endDate} onChange={e => setLeaveForm({ ...leaveForm, endDate: e.target.value })} /></div>
-                        </div>
-                        <button type="button" onClick={() => {
-                          if (!leaveForm.startDate || !leaveForm.endDate) return;
-                          let start = new Date(leaveForm.startDate); let end = new Date(leaveForm.endDate); if (start > end) return;
-                          let dArr = [...leaveForm.dates]; let curr = new Date(start);
-                          while (curr <= end) {
-                            let dStr = curr.toISOString().split('T')[0]; if (!dArr.includes(dStr)) dArr.push(dStr);
-                            curr.setDate(curr.getDate() + 1);
-                          }
-                          setLeaveForm({ ...leaveForm, dates: dArr.sort() });
-                        }} className="w-full py-2 bg-[#222222] text-white font-black text-[10px] rounded-md tracking-wider">批量生成區間內所有日期</button>
-                      </div>
-                    </div>
-                    {leaveForm.dates.length > 0 && (
-                      <div>
-                        <span className="block font-bold text-gray-400 mb-1">已選定的請假日期：</span>
-                        <div className="flex flex-wrap gap-1 p-2 bg-gray-50 border rounded-md max-h-20 overflow-y-auto">
-                          {leaveForm.dates.map(d => <span key={d} className="inline-flex items-center bg-red-50 text-red-700 px-2 py-0.5 border border-red-200 rounded font-bold text-[10px]">{d}<button onClick={() => setLeaveForm({...leaveForm, dates: leaveForm.dates.filter(dt => dt !== d)})} className="ml-1 text-red-500 font-black">✕</button></span>)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {modalType === 'completeMakeup' && (
-                  <div className="space-y-3">
-                    <div><label className="block font-black mb-1">實際補課日期</label><input type="date" className="w-full p-2.5 border rounded-md font-bold" value={makeupForm.date} onChange={e => setMakeupForm({ ...makeupForm, date: e.target.value })} /></div>
-                    <div><label className="block font-black mb-1">對應補課班級科目</label><select className="w-full p-2.5 border bg-white font-bold rounded-md" value={makeupForm.courseId} onChange={e => setMakeupForm({ ...makeupForm, courseId: e.target.value })}>{courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-3.5 bg-gray-50 border-t-2 border-[#222222] flex justify-end gap-2 text-xs font-black">
-                <button onClick={closeModal} className="px-3.5 py-2.5 bg-gray-200 rounded-md">取消</button>
-                <button onClick={() => { if(modalType==='student') saveStudentData(); if(modalType==='course') saveCourseData(); if(modalType==='enroll') saveEnrollment(); if(modalType==='leave') saveLeaveData(); if(modalType==='completeMakeup') saveMakeupCompletion(); }} className="px-5 py-2.5 bg-[#222222] text-white rounded-md active:opacity-90">確認儲存</button>
-              </div>
-            </div>
-          </div>
-        );
-      };
-
-      const renderConfirmModal = () => {
-        if (!isConfirmOpen) return null;
-        return (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-            <div className="bg-white muji-border rounded-lg max-w-xs w-full p-5 space-y-4 shadow-xl">
-              <h4 className="font-black text-base text-gray-900">⚠️ 系統安全確認</h4>
-              <p className="text-xs text-gray-500 leading-relaxed">確定要抹除或重置這項系統內部數據嗎？此動作將永久移除相關的快取連結。</p>
-              <div className="flex justify-end gap-2 text-xs font-bold pt-2">
-                <button onClick={() => setIsConfirmOpen(false)} className="px-3 py-2 bg-gray-100 rounded border">取消</button>
-                <button onClick={handleExecuteDelete} className="px-3 py-2 bg-red-600 text-white rounded border border-red-700">確認清除</button>
-              </div>
-            </div>
-          </div>
-        );
-      };
-
-      return (
-        <div className="min-h-screen flex flex-col justify-between">
-          <header className="bg-white border-b-2 border-[#222222] sticky top-0 z-40">
-            <div className="max-w-md mx-auto px-4 h-12 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-[#222222] text-white flex items-center justify-center font-black text-xs rounded-sm">教</div>
-                <h1 className="font-black text-xs tracking-tight">Attendance Management Pro</h1>
-              </div>
-              <span className="text-[9px] bg-neutral-100 border border-neutral-400 px-1.5 py-0.5 rounded font-bold text-neutral-600">老師專用獨立版 v1.2</span>
-            </div>
-          </header>
-
-          <main className="flex-1 max-w-md w-full mx-auto px-3 pt-3 safe-bottom">
-            {activeTab === 'dashboard' && renderDashboardView()}
-            {activeTab === 'students' && renderStudentsView()}
-            {activeTab === 'courses' && renderCoursesView()}
-            {activeTab === 'leaves' && renderLeavesView()}
-          </main>
-
-          <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-[#222222] z-40 pb-[env(safe-area-inset-bottom)] shadow-md">
-            <div className="max-w-md mx-auto h-14 grid grid-cols-4 items-center">
-              <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center justify-center h-full transition-all ${activeTab === 'dashboard' ? 'text-orange-600 font-black scale-105' : 'text-gray-400 font-medium'}`}>
-                <Icons.Home /><span className="text-[9px] mt-1">今日看板</span>
-              </button>
-              <button onClick={() => { setActiveTab('students'); setStudentSearch(''); setExpandedStudentId(null); }} className={`flex flex-col items-center justify-center h-full transition-all ${activeTab === 'students' ? 'text-[#222222] font-black scale-105' : 'text-gray-400 font-medium'}`}>
-                <Icons.Users /><span className="text-[9px] mt-1">學生選課</span>
-              </button>
-              <button onClick={() => setActiveTab('courses')} className={`flex flex-col items-center justify-center h-full transition-all ${activeTab === 'courses' ? 'text-[#222222] font-black scale-105' : 'text-gray-400 font-medium'}`}>
-                <Icons.BookOpen /><span className="text-[9px] mt-1">課表排程</span>
-              </button>
-              <button onClick={() => { setActiveTab('leaves'); setLeaveSearch(''); }} className={`flex flex-col items-center justify-center h-full transition-all ${activeTab === 'leaves' ? 'text-[#222222] font-black scale-105' : 'text-gray-400 font-medium'}`}>
-                <Icons.Calendar /><span className="text-[9px] mt-1">請假補課</span>
-              </button>
-            </div>
-          </nav>
-
-          {renderFormModal()}
-          {renderConfirmModal()}
-        </div>
-      );
-    };
-
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
-</body>
+          </header> 
+ 
+          {/* 內容抽換主要區塊 */} 
+          <main class="flex-1 p-4 overflow-y-auto"> 
+            {activeTab === 'dashboard' && renderDashboard()} 
+            {activeTab === 'students' && renderStudents()} 
+            {activeTab === 'courses' && renderCourses()} 
+            {activeTab === 'leaves' && renderLeaves()} 
+          </main> 
+ 
+          {/* 下底導覽標籤列 */} 
+          <nav class="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-black h-16 z-40 shadow-lg max-w-md mx-auto"> 
+            <div class="grid grid-cols-4 h-full"> 
+              <button onClick={() => setActiveTab('dashboard')} class={`flex flex-col items-center justify-center h-full transition-all ${activeTab === 'dashboard' ? 'text-[#222222] font-black scale-105' : 'text-gray-400 font-medium'}`}> 
+                <Icons.Home /><span class="text-[9px] mt-1">今日看板</span> 
+              </button> 
+              <button onClick={() => { setActiveTab('students'); setStudentSearch(''); setExpandedStudentId(null); }} class={`flex flex-col items-center justify-center h-full transition-all ${activeTab === 'students' ? 'text-[#222222] font-black scale-105' : 'text-gray-400 font-medium'}`}> 
+                <Icons.Users /><span class="text-[9px] mt-1">學生選課</span> 
+              </button> 
+              <button onClick={() => setActiveTab('courses')} class={`flex flex-col items-center justify-center h-full transition-all ${activeTab === 'courses' ? 'text-[#222222] font-black scale-105' : 'text-gray-400 font-medium'}`}> 
+                <Icons.BookOpen /><span class="text-[9px] mt-1">課表排程</span> 
+              </button> 
+              <button onClick={() => { setActiveTab('leaves'); setLeaveSearch(''); }} class={`flex flex-col items-center justify-center h-full transition-all ${activeTab === 'leaves' ? 'text-[#222222] font-black scale-105' : 'text-gray-400 font-medium'}`}> 
+                <Icons.Calendar /><span class="text-[9px] mt-1">請假補課</span> 
+              </button> 
+            </div> 
+          </nav> 
+ 
+          {renderModal()} 
+          {renderConfirmModal()} 
+        </div> 
+      ); 
+    }; 
+ 
+    const root = ReactDOM.createRoot(document.getElementById('root')); 
+    root.render(<App />); 
+  </script> 
+</body> 
 </html>
