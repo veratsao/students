@@ -235,7 +235,8 @@
 
       // --- 1. 今日看板 ---
       const renderDashboard = () => {
-        const activeCourse = activeCoursesToday.find(c => c.id === selectedCourseId) || activeCoursesToday[0];
+        const activeCourse = activeCoursesToday.find(c => c.id === selectedCourseId);
+        const isAllView = selectedCourseId === null;
         
         return (
           <div class="space-y-6">
@@ -254,8 +255,17 @@
                 <div class="p-6 text-center text-sm text-gray-400 muji-card bg-gray-50">此日期區間內今日無安排課程</div>
               ) : (
                 <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  {/* 全日總覽切換按鈕 */}
+                  <button onClick={() => setSelectedCourseId(null)} class={`flex-shrink-0 p-3 w-40 text-left muji-card transition-all ${isAllView ? 'bg-[#7f7870] text-white border-[#7f7870]' : ''}`}>
+                    <div class="font-black text-sm truncate">全部當日學生</div>
+                    <div class={`text-[10px] font-bold truncate ${isAllView ? 'text-gray-200' : 'text-gray-500'}`}>合併檢視</div>
+                    <div class="mt-2 text-xs font-mono">
+                      共 {activeCoursesToday.length} 門課程
+                    </div>
+                  </button>
+
                   {activeCoursesToday.map(c => {
-                    const isSel = activeCourse && activeCourse.id === c.id;
+                    const isSel = !isAllView && activeCourse && activeCourse.id === c.id;
                     const todaySched = c.schedule.filter(s => s.day === targetDayIndex);
                     return (
                       <button key={c.id} onClick={() => setSelectedCourseId(c.id)} class={`flex-shrink-0 p-3 w-40 text-left muji-card transition-all ${isSel ? 'bg-[#7f7870] text-white border-[#7f7870]' : ''}`}>
@@ -271,62 +281,165 @@
               )}
             </div>
 
-            {activeCourse && (
-              <div class="p-5 muji-card space-y-4">
-                <div class="flex justify-between items-start border-b border-gray-200 pb-3">
-                  <div>
-                    <span class="inline-block px-2 py-0.5 bg-black text-white text-[10px] font-bold mb-1 rounded">{activeCourse.term}</span>
-                    <h2 class="text-lg font-black">{activeCourse.name} 學生名單</h2>
-                    <p class="text-xs text-gray-400 mt-0.5">授課區間: {activeCourse.startDate} 至 {activeCourse.endDate}</p>
+            {activeCoursesToday.length > 0 && (
+              isAllView ? (
+                /* --- A. 當日有課程之學生 (合併檢視一鍵請假) --- */
+                <div class="p-5 muji-card space-y-4">
+                  <div class="flex justify-between items-start border-b border-gray-200 pb-3">
+                    <div>
+                      <span class="inline-block px-2 py-0.5 bg-black text-white text-[10px] font-bold mb-1 rounded">今日總覽</span>
+                      <h2 class="text-lg font-black">當日所有修課學生名單</h2>
+                      <p class="text-xs text-gray-400 mt-0.5">顯示今日有課的學員與其請假狀態</p>
+                    </div>
+                    <div class="text-right text-xs font-bold bg-gray-100 px-2 py-1 rounded muji-border">
+                      星期{DAYS_SHORT[targetDayIndex]}
+                    </div>
                   </div>
-                  <div class="text-right text-xs font-bold bg-gray-100 px-2 py-1 rounded muji-border">
-                    星期{DAYS_SHORT[targetDayIndex]}
-                  </div>
-                </div>
 
-                <div class="divide-y divide-gray-100">
-                  {students.filter(s => s.courses.includes(activeCourse.id)).length === 0 ? (
-                    <div class="py-4 text-center text-sm text-gray-400">本期數尚無學生選課</div>
-                  ) : (
-                    students.filter(s => s.courses.includes(activeCourse.id)).map(student => {
-                      // 檢查是否請假
-                      const isLeft = leaves.some(l => l.studentId === student.id && l.courseId === activeCourse.id && l.date === targetDate && l.type !== 'makeup');
-                      // 檢查今天是否為該學生的某堂課補課日
-                      const isMakeup = leaves.some(l => l.studentId === student.id && l.makeupCourseId === activeCourse.id && l.makeupDate === targetDate);
-                      
-                      return (
-                        <div key={student.id} class="flex items-center justify-between py-3">
-                          <div class="flex items-center gap-2">
-                            <span class="font-black text-base">{student.name}</span>
-                            {isLeft && <span class="text-xs font-bold px-1.5 py-0.5 bg-red-100 text-red-700 rounded border border-red-300">請假</span>}
-                            {isMakeup && <span class="text-xs font-bold px-1.5 py-0.5 bg-green-100 text-green-700 rounded border border-green-300">補課日</span>}
-                            {!isLeft && !isMakeup && <span class="text-xs font-bold px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">一般到課</span>}
-                          </div>
-                          
-                          <div class="flex gap-2">
-                            {isLeft ? (
-                              <button onClick={() => setLeaves(leaves.filter(l => !(l.studentId === student.id && l.courseId === activeCourse.id && l.date === targetDate)))} class="p-1 text-xs font-bold border border-gray-400 rounded hover:bg-gray-50 flex items-center gap-1">
-                                <Icons.Undo /> 撤銷請假
-                              </button>
-                            ) : (
-                              <button 
-                                onClick={() => {
-                                  const newL = { id: 'l_' + Date.now(), studentId: student.id, courseId: activeCourse.id, date: targetDate, type: 'leave', makeupDate: null, makeupCourseId: null };
-                                  setLeaves([...leaves, newL]);
-                                }}
-                                disabled={isMakeup}
-                                class={`px-2 py-1 text-xs font-bold rounded muji-border bg-white text-red-600 ${isMakeup ? 'opacity-30' : 'hover:bg-red-50'}`}
-                              >
-                                快速請假
-                              </button>
-                            )}
-                          </div>
-                        </div>
+                  <div class="divide-y divide-gray-100">
+                    {(() => {
+                      // 找出今日有課的所有學生
+                      const studentsWithClassToday = students.filter(s => 
+                        s.courses.some(cid => activeCoursesToday.some(ac => ac.id === cid))
                       );
-                    })
-                  )}
+
+                      if (studentsWithClassToday.length === 0) {
+                        return <div class="py-4 text-center text-sm text-gray-400">今日無任何學生有排課</div>;
+                      }
+
+                      return studentsWithClassToday.map(student => {
+                        // 該生今日的所有修課
+                        const studentCoursesToday = student.courses.filter(cid => activeCoursesToday.some(ac => ac.id === cid));
+                        // 該生今日已請假的課程 ID
+                        const leftCourseIds = leaves
+                          .filter(l => l.studentId === student.id && l.date === targetDate && l.type !== 'makeup')
+                          .map(l => l.courseId);
+                        
+                        // 檢查請假狀態
+                        const isAllLeft = studentCoursesToday.every(cid => leftCourseIds.includes(cid));
+                        const isPartiallyLeft = !isAllLeft && studentCoursesToday.some(cid => leftCourseIds.includes(cid));
+                        const isMakeup = leaves.some(l => l.studentId === student.id && l.makeupCourseId && studentCoursesToday.includes(l.makeupCourseId) && l.makeupDate === targetDate);
+
+                        return (
+                          <div key={student.id} class="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                              <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-black text-base">{student.name}</span>
+                                {isAllLeft && <span class="text-xs font-bold px-1.5 py-0.5 bg-red-100 text-red-700 rounded border border-red-300">今日全請假</span>}
+                                {isPartiallyLeft && <span class="text-xs font-bold px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded border border-amber-300">部分請假</span>}
+                                {!isAllLeft && !isPartiallyLeft && !isMakeup && <span class="text-xs font-bold px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">正常到課</span>}
+                                {isMakeup && <span class="text-xs font-bold px-1.5 py-0.5 bg-green-100 text-green-700 rounded border border-green-300">有補課日</span>}
+                              </div>
+                              <div class="text-[11px] text-gray-500 mt-1">
+                                今日課程：{studentCoursesToday.map(cid => {
+                                  const c = activeCoursesToday.find(ac => ac.id === cid);
+                                  const isCLeft = leftCourseIds.includes(cid);
+                                  return (
+                                    <span key={cid} class={`inline-block mr-2 ${isCLeft ? 'text-red-400 line-through' : 'text-gray-700 font-medium'}`}>
+                                      ● {c ? c.name : ''}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            
+                            <div class="flex gap-2 self-end sm:self-center">
+                              {isAllLeft ? (
+                                <button 
+                                  onClick={() => {
+                                    // 撤銷該生今日這幾門課的所有請假
+                                    setLeaves(leaves.filter(l => !(l.studentId === student.id && l.date === targetDate && studentCoursesToday.includes(l.courseId) && l.type !== 'makeup')));
+                                  }} 
+                                  class="p-1 text-xs font-bold border border-gray-400 rounded hover:bg-gray-50 flex items-center gap-1"
+                                >
+                                  <Icons.Undo /> 撤銷全假
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => {
+                                    // 一鍵請假當日所有課程：把沒請假的課都補上請假紀錄
+                                    const unleftCourseIds = studentCoursesToday.filter(cid => !leftCourseIds.includes(cid));
+                                    const newLeaves = unleftCourseIds.map(cid => ({
+                                      id: 'l_' + Date.now() + Math.random().toString(36).substr(2, 4),
+                                      studentId: student.id,
+                                      courseId: cid,
+                                      date: targetDate,
+                                      type: 'leave',
+                                      makeupDate: null,
+                                      makeupCourseId: null
+                                    }));
+                                    setLeaves([...leaves, ...newLeaves]);
+                                  }}
+                                  class="px-2 py-1 text-xs font-bold rounded muji-border bg-white text-red-600 hover:bg-red-50 shadow-xs"
+                                >
+                                  一鍵請假當日課程
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* --- B. 原有單向單一課程檢視區塊 --- */
+                <div class="p-5 muji-card space-y-4">
+                  <div class="flex justify-between items-start border-b border-gray-200 pb-3">
+                    <div>
+                      <span class="inline-block px-2 py-0.5 bg-black text-white text-[10px] font-bold mb-1 rounded">{activeCourse.term}</span>
+                      <h2 class="text-lg font-black">{activeCourse.name} 學生名單</h2>
+                      <p class="text-xs text-gray-400 mt-0.5">授課區間: {activeCourse.startDate} 至 {activeCourse.endDate}</p>
+                    </div>
+                    <div class="text-right text-xs font-bold bg-gray-100 px-2 py-1 rounded muji-border">
+                      星期{DAYS_SHORT[targetDayIndex]}
+                    </div>
+                  </div>
+
+                  <div class="divide-y divide-gray-100">
+                    {students.filter(s => s.courses.includes(activeCourse.id)).length === 0 ? (
+                      <div class="py-4 text-center text-sm text-gray-400">本期數尚無學生選課</div>
+                    ) : (
+                      students.filter(s => s.courses.includes(activeCourse.id)).map(student => {
+                        // 檢查是否請假
+                        const isLeft = leaves.some(l => l.studentId === student.id && l.courseId === activeCourse.id && l.date === targetDate && l.type !== 'makeup');
+                        // 檢查今天是否為該學生的某堂課補課日
+                        const isMakeup = leaves.some(l => l.studentId === student.id && l.makeupCourseId === activeCourse.id && l.makeupDate === targetDate);
+                        
+                        return (
+                          <div key={student.id} class="flex items-center justify-between py-3">
+                            <div class="flex items-center gap-2">
+                              <span class="font-black text-base">{student.name}</span>
+                              {isLeft && <span class="text-xs font-bold px-1.5 py-0.5 bg-red-100 text-red-700 rounded border border-red-300">請假</span>}
+                              {isMakeup && <span class="text-xs font-bold px-1.5 py-0.5 bg-green-100 text-green-700 rounded border border-green-300">補課日</span>}
+                              {!isLeft && !isMakeup && <span class="text-xs font-bold px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">一般到課</span>}
+                            </div>
+                            
+                            <div class="flex gap-2">
+                              {isLeft ? (
+                                <button onClick={() => setLeaves(leaves.filter(l => !(l.studentId === student.id && l.courseId === activeCourse.id && l.date === targetDate)))} class="p-1 text-xs font-bold border border-gray-400 rounded hover:bg-gray-50 flex items-center gap-1">
+                                  <Icons.Undo /> 撤銷請假
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => {
+                                    const newL = { id: 'l_' + Date.now(), studentId: student.id, courseId: activeCourse.id, date: targetDate, type: 'leave', makeupDate: null, makeupCourseId: null };
+                                    setLeaves([...leaves, newL]);
+                                  }}
+                                  disabled={isMakeup}
+                                  class={`px-2 py-1 text-xs font-bold rounded muji-border bg-white text-red-600 ${isMakeup ? 'opacity-30' : 'hover:bg-red-50'}`}
+                                >
+                                  快速請假
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )
             )}
           </div>
         );
@@ -420,7 +533,7 @@
                   <div class="flex justify-between items-start">
                     <div>
                       <div class="flex items-center gap-2">
-                        <h4 class="font-black text-base">`{course.name}`</h4>
+                        <h4 class="font-black text-base">{course.name}</h4>
                         <span class="px-2 py-0.5 bg-gray-100 text-[#222222] text-[10px] font-bold rounded muji-border">{course.term}</span>
                       </div>
                       <p class="text-xs text-gray-400 font-medium mt-1">
@@ -465,7 +578,7 @@
         );
       };
 
-      // --- 4. 請假與補課作業 (重構：請假下方直接備註補課格子，採不同格式) ---
+      // --- 4. 請假與補課作業 ---
       const renderLeaves = () => {
         return (
           <div class="space-y-4">
@@ -497,7 +610,7 @@
                     return (
                       <div key={item.id} class="p-3 border-2 border-black rounded-lg bg-white space-y-3">
                         
-                        {/* 格式一：上方請假課程區塊（琥珀色/警示待處理風格） */}
+                        {/* 格式一：上方請假課程區塊 */}
                         <div class="bg-amber-50/70 border-l-4 border-amber-500 p-2.5 rounded-r">
                           <div class="flex justify-between items-center">
                             <div class="flex items-center gap-2">
